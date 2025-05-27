@@ -3,19 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Call Simulator</title>
+  <title>Call Simulator PWA</title>
   <link rel="manifest" href="manifest.json" />
   <style>
     body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-    #transcript, #ai-response {
-      margin: 20px auto;
-      padding: 10px;
-      border: 1px solid #ccc;
-      width: 90%;
-      max-width: 600px;
-      min-height: 60px;
-      overflow-y: auto;
-    }
+    #transcript, #ai-response { margin: 20px auto; padding: 10px; border: 1px solid #ccc; width: 90%; max-width: 600px; min-height: 60px; overflow-y: auto; }
     button { margin: 10px; padding: 10px 20px; font-size: 16px; }
     #loader { display: none; margin-top: 10px; }
   </style>
@@ -36,14 +28,14 @@
   </div>
 
   <script>
-    // Register service worker for PWA functionality
+    // Register service worker for PWA
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js')
         .then(() => console.log('Service Worker registered'))
-        .catch(err => console.error('SW register failed:', err));
+        .catch(err => console.error('SW registration failed:', err));
     }
 
-    const WORKER_URL = 'https://workers-playground-sweet-truth-533a.amrassal91.workers.dev';
+    const WORKER_URL = 'https://workers-playground-tiny-sky-5f02.amrassal91.workers.dev';
     const startBtn = document.getElementById('start-btn');
     const sendBtn = document.getElementById('send-btn');
     const loader = document.getElementById('loader');
@@ -52,46 +44,31 @@
 
     let recognition, finalTranscript = '', isRecognizing = false;
 
+    // Initialize Speech Recognition
     function initRecognition() {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SR) { alert('Speech Recognition not supported.'); return null; }
       const rec = new SR();
-      rec.lang = 'en-US';
-      rec.interimResults = true;
-      rec.continuous = true;
-      rec.onstart = () => {
-        isRecognizing = true;
-        startBtn.textContent = '🛑 Stop';
-        startBtn.disabled = false;
-        transcriptEl.textContent = 'Listening...';
-      };
+      rec.lang = 'en-US'; rec.interimResults = true; rec.continuous = true;
+      rec.onstart = () => { isRecognizing = true; startBtn.textContent = '🛑 Stop'; startBtn.disabled = false; transcriptEl.textContent = 'Listening...'; };
       rec.onresult = e => {
         let interim = '';
         for (let i = e.resultIndex; i < e.results.length; i++) {
-          let t = e.results[i][0].transcript;
+          const t = e.results[i][0].transcript;
           if (e.results[i].isFinal) finalTranscript += t + ' ';
           else interim += t;
         }
         transcriptEl.textContent = finalTranscript + interim;
         sendBtn.disabled = !(finalTranscript.trim());
       };
-      rec.onerror = e => {
-        transcriptEl.textContent = 'Error: ' + e.error;
-        stopRec();
-      };
-      rec.onend = () => {
-        isRecognizing = false;
-        startBtn.textContent = '🎤 Start Listening';
-      };
+      rec.onerror = e => { transcriptEl.textContent = 'Error: ' + e.error; stopRec(); };
+      rec.onend = () => { isRecognizing = false; startBtn.textContent = '🎤 Start Listening'; };
       return rec;
     }
 
     function startRec() {
       if (!recognition) recognition = initRecognition();
-      finalTranscript = '';
-      transcriptEl.textContent = '';
-      sendBtn.disabled = true;
-      recognition.start();
+      finalTranscript = ''; transcriptEl.textContent = ''; sendBtn.disabled = true; recognition.start();
     }
     function stopRec() {
       if (recognition && isRecognizing) recognition.stop();
@@ -103,25 +80,37 @@
       setTimeout(() => startBtn.disabled = false, 500);
     });
 
+    // Fetch with retry logic
+    async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
+      for (let i = 0; i < retries; i++) {
+        try {
+          const res = await fetch(url, options);
+          if (!res.ok) {
+            const errBody = await res.json().catch(() => ({}));
+            throw new Error(`HTTP ${res.status}: ${JSON.stringify(errBody)}`);
+          }
+          return res;
+        } catch (err) {
+          if (i === retries - 1) throw err;
+          await new Promise(r => setTimeout(r, delay));
+        }
+      }
+    }
+
     sendBtn.addEventListener('click', async () => {
-      stopRec();
-      sendBtn.disabled = true;
-      loader.style.display = 'block';
-      aiResponseEl.textContent = '';
+      stopRec(); sendBtn.disabled = true; loader.style.display = 'block'; aiResponseEl.textContent = '';
       try {
         const payload = { contents: [{ parts: [{ text: finalTranscript.trim() }] }] };
-        const res = await fetch(WORKER_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const res = await fetchWithRetry(WORKER_URL, {
+          method: 'POST', mode: 'cors', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
         const data = await res.json();
         const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '(No response)';
-        aiResponseEl.textContent = reply;
-        speak(reply);
+        aiResponseEl.textContent = reply; speak(reply);
       } catch (e) {
         aiResponseEl.textContent = 'AI Error: ' + e.message;
+        console.error('Fetch error:', e);
       } finally {
         loader.style.display = 'none';
       }
@@ -130,8 +119,7 @@
     function speak(txt) {
       if (!window.speechSynthesis) return;
       const u = new SpeechSynthesisUtterance(txt);
-      u.lang = 'en-US';
-      speechSynthesis.speak(u);
+      u.lang = 'en-US'; window.speechSynthesis.speak(u);
     }
   </script>
 </body>
