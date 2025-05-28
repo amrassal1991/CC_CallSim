@@ -1,74 +1,116 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AI Speech PWA</title>
-<link rel="manifest" href="manifest.json" />
-<style>
-  body { font-family: Arial, sans-serif; padding: 1em; }
-  button { font-size: 1.2em; padding: 0.5em 1em; }
-  #result { margin-top: 1em; white-space: pre-wrap; }
-</style>
+  <meta charset="UTF-8">
+  <title>Comcast Call Simulator</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    button { padding: 10px 15px; margin: 5px; }
+    #mic-status { color: red; font-weight: bold; display: none; }
+    #chat { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto; margin-bottom: 10px; }
+    .agent { color: blue; }
+    .customer { color: green; }
+  </style>
 </head>
 <body>
-<h1>Speak & Ask AI</h1>
-<button id="startBtn">🎤 Start Speaking</button>
-<div id="result"></div>
+  <h2>Comcast Call Simulation</h2>
+  <div id="chat"></div>
 
-<script>
-const startBtn = document.getElementById('startBtn')
-const resultDiv = document.getElementById('result')
+  <div>
+    <button onclick="startSimulation()">Start Simulation</button>
+    <button id="micBtn" onclick="startMic()" disabled>🎤 Talk</button>
+    <span id="mic-status">Mic ON</span>
+  </div>
 
-let recognition
-if ('webkitSpeechRecognition' in window) {
-  recognition = new webkitSpeechRecognition()
-} else if ('SpeechRecognition' in window) {
-  recognition = new SpeechRecognition()
-} else {
-  alert('Speech Recognition not supported in this browser.')
-}
+  <input type="text" id="manualInput" placeholder="Type message..." style="width: 70%;">
+  <button onclick="sendMessage()">Send</button>
 
-if (recognition) {
-  recognition.lang = 'en-US'
-  recognition.interimResults = false
-  recognition.maxAlternatives = 1
+  <script>
+    const inquiries = [
+      "My TV service keeps freezing.",
+      "I was overcharged on my last bill.",
+      "My internet is down since yesterday.",
+      "I need to return my modem.",
+      "Can I upgrade my plan?"
+    ];
+    let chat = document.getElementById('chat');
+    let micStatus = document.getElementById('mic-status');
+    let micBtn = document.getElementById('micBtn');
+    let currentStep = 'agent';
 
-  recognition.onresult = async (event) => {
-    const speechText = event.results[0][0].transcript
-    resultDiv.textContent = `You said: "${speechText}"\n\nWaiting for AI response...`
-
-    const body = {
-      contents: [
-        { parts: [{ text: speechText }] }
-      ]
+    function addMessage(role, msg) {
+      const div = document.createElement('div');
+      div.className = role;
+      div.textContent = `${role === 'agent' ? 'Agent' : 'Customer'}: ${msg}`;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
     }
 
-    try {
-      const res = await fetch('https://workers-playground-sweet-truth-533a.amrassal91.workers.dev/', {
+    function startSimulation() {
+      chat.innerHTML = '';
+      const inquiry = inquiries[Math.floor(Math.random() * inquiries.length)];
+      addMessage('customer', inquiry);
+      currentStep = 'agent';
+      micBtn.disabled = false;
+    }
+
+    function startMic() {
+      micStatus.style.display = 'inline';
+      let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'en-US';
+      recognition.start();
+
+      recognition.onresult = (e) => {
+        let transcript = e.results[0][0].transcript;
+        recognition.stop();
+        micStatus.style.display = 'none';
+
+        if (transcript.toLowerCase().includes('send')) {
+          sendMessage('');
+        } else {
+          document.getElementById('manualInput').value = transcript;
+        }
+      };
+
+      recognition.onerror = () => {
+        micStatus.style.display = 'none';
+      };
+    }
+
+    async function sendMessage(msg = '') {
+      const input = document.getElementById('manualInput');
+      const text = msg || input.value;
+      if (!text.trim()) return;
+
+      addMessage('agent', text);
+      input.value = '';
+      micBtn.disabled = true;
+
+      // Simulate customer reply via AI
+      const reply = await getAIResponse(text);
+      addMessage('customer', reply);
+      micBtn.disabled = false;
+    }
+
+    async function getAIResponse(text) {
+      const res = await fetch('https://your-cloudflare-endpoint.com', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      })
-      const data = await res.json()
-
-      // Adjust depending on actual API response structure:
-      const aiReply = data.candidates?.[0]?.content || JSON.stringify(data)
-      resultDiv.textContent = `You said: "${speechText}"\n\nAI says:\n${aiReply}`
-    } catch (err) {
-      resultDiv.textContent = `Error fetching AI response: ${err.message}`
+        body: JSON.stringify({ contents: [{ parts: [{ text }] }] })
+      });
+      const data = await res.json();
+      return data?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, can you repeat that?";
     }
-  }
 
-  recognition.onerror = (event) => {
-    resultDiv.textContent = `Speech recognition error: ${event.error}`
-  }
-
-  startBtn.onclick = () => {
-    resultDiv.textContent = ''
-    recognition.start()
-  }
-}
-</script>
+    // Idle timer
+    let idleTimer;
+    document.onmousemove = document.onkeypress = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        alert("Call idle. Starting new scenario...");
+        startSimulation();
+      }, 60000);
+    };
+  </script>
 </body>
 </html>
