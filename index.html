@@ -83,7 +83,7 @@
     <button id="send-btn" disabled>✉️ Send</button>
     <button id="mic-btn" disabled>Microphone: Off</button>
     <button id="speaker-btn" disabled>Speaker: Off</button>
-    <div id="loader">⏳ AI is thinking...</div>
+    <div id="loader">⏳ Processing...</div>
 
     <h3>Call Transcription:</h3>
     <div id="transcription">—</div>
@@ -91,8 +91,6 @@
 
   <script type="module">
     import { evaluateS4Response } from './s4_guidelines.js';
-
-    const WORKER_URL = 'https://workers-playground-tiny-sky-5f02.amrassal91.workers.dev';
 
     const startBtn = document.getElementById('start-btn');
     const sendBtn = document.getElementById('send-btn');
@@ -110,6 +108,7 @@
     let callStage = 'S1';
     let conversationHistory = [];
     let isSimulationActive = false;
+    let evaluations = []; // Store evaluations for end-of-call summary
 
     function initRecognition() {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -199,7 +198,7 @@
       }
     }
 
-    async function sendMessage(text) {
+    function sendMessage(text) {
       if (!text || !isSimulationActive) return;
       stopRec();
       sendBtn.disabled = true;
@@ -211,12 +210,12 @@
       transcriptionEl.innerHTML = transcriptionEl.innerHTML.replace(/Listening\.\.\.$/, '') + `<b>Agent:</b> ${text}<br>`;
 
       try {
-        // Evaluate agent response
+        // Evaluate agent response, store for later
         const evaluation = evaluateS4Response(text, callStage, conversationHistory);
-        transcriptionEl.innerHTML += `${evaluation.comment}<br>`;
+        evaluations.push({ text, comment: evaluation.comment, score: evaluation.score });
         conversationHistory.push({ role: 'agent', content: text });
 
-        // Generate customer response
+        // Hardcoded customer response
         let reply = '';
         const lowerText = text.toLowerCase();
         if (conversationHistory.length === 1) {
@@ -238,26 +237,7 @@
         } else if (lowerText.match(/schedule.*callback/i)) {
           reply = 'No, that is all of it.';
         } else {
-          const prompt = `
-You are a Comcast postpaid small to medium business customer named Mark Smith. Respond ONLY as the customer, strictly following this call flow:
-- Agent: "Thank you for contacting Comcast..." → "Hello, this is Mark Smith."
-- Agent: "How can I assist..." → "My bill is doubled..."
-- Agent: "Verify your account" → "Yes, sure."
-- Agent: "Provide account number..." → "Sure, my service address is 15 Northwest St..."
-- Agent: "Checking your bill" → "Thank you."
-- Agent: "Reason for increase" → "Thank you so much. That’s appreciated."
-- Agent: "Fixed... $200" → "No, that’s all of it."
-- Agent: "Mobile... discount" → "Yeah, that looks like a good offer..."
-- Agent: "Schedule callback" → "No, that is all of it."
-For agent input: "${text}", respond in character with a short reply. Call stage: ${callStage}. History: ${JSON.stringify(conversationHistory)}.`;
-          const payload = { contents: [{ parts: [{ text: prompt }] }] };
-          const res = await fetch(WORKER_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          const data = await res.json();
-          reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '(No response)';
+          reply = 'I’m not sure how to respond to that. Can you assist with my bill issue?';
         }
 
         transcriptionEl.innerHTML += `<b>Customer:</b> ${reply}<br>`;
@@ -278,7 +258,7 @@ For agent input: "${text}", respond in character with a short reply. Call stage:
         });
       } catch (e) {
         transcriptionEl.innerHTML += `<b>Error:</b> ${e.message}<br>`;
-        console.error('Fetch failed:', e);
+        console.error('Error:', e);
         speak('Error: Unable to respond.', () => {
           if (isSimulationActive) startRec();
         });
@@ -310,12 +290,22 @@ For agent input: "${text}", respond in character with a short reply. Call stage:
       isSimulationActive = false;
       callStage = 'S1';
       conversationHistory = [];
-      transcriptionEl.innerHTML = '—';
+
+      // Display evaluation summary
+      if (evaluations.length > 0) {
+        transcriptionEl.innerHTML += '<br><b>Evaluation Summary:</b><br>';
+        evaluations.forEach((eval, index) => {
+          transcriptionEl.innerHTML += `<b>Agent ${index + 1}:</b> ${eval.text}<br>${eval.comment}<br>`;
+        });
+      }
+
+      evaluations = []; // Clear evaluations
       startBtn.textContent = '🎤 Start Conversation';
       startBtn.classList.remove('active');
       sendBtn.disabled = true;
       micBtn.disabled = true;
       speakerBtn.disabled = true;
+      transcriptionEl.scrollTop = transcriptionEl.scrollHeight;
     }
 
     startBtn.addEventListener('click', () => {
@@ -326,13 +316,14 @@ For agent input: "${text}", respond in character with a short reply. Call stage:
         startBtn.textContent = '🛑 End Conversation';
         startBtn.classList.add('active');
         transcriptionEl.innerHTML = '';
+        evaluations = [];
         startRec();
       }
     });
 
     sendBtn.addEventListener('click', () => {
       clearTimeout(autoSendTimer);
-      sendMessage(finalTranscript.trim());
+      sendMessage(finalTranscript);
     });
 
     autoSendCheckbox.addEventListener('change', (e) => {
@@ -343,8 +334,144 @@ For agent input: "${text}", respond in character with a short reply. Call stage:
     });
 
     timeoutSecondsInput.addEventListener('input', (e) => {
-      autoSendDelay = parseInt(e.target.value) * 1000;
+      autoSendDelay = parseInt(e.target.value) * 1000 || 60000;
     });
   </script>
 </body>
 </html>
+</xai>
+
+---
+
+### **Key Features**
+1. **AI Call Flow**:
+   - Hardcoded responses ensure the AI follows the exact call flow as Mark Smith (e.g., “Hello, this is Mark Smith” for the greeting).
+   - Fallback response (“I’m not sure how to respond…”) for unexpected input.
+
+2. **Single Transcription Box**:
+   - `#transcription` div with `max-height: 400px` and `overflow-y: auto`.
+   - During role-play: “Agent: [text]<br>Customer: [reply]<br>”.
+   - After “End Conversation”: Adds “<br><b>Evaluation Summary:</b><br>” followed by evaluations for each agent response.
+   - Auto-scrolls with `scrollTop = scrollHeight`.
+
+3. **Comments**:
+   - Suppressed during role-play, stored in `evaluations` array.
+   - Displayed only after “End Conversation” in a summary block, italicized, 1-2 lines, e.g., “*S1: Greeting ME (3), Authenticate HE (4), Tone ME (3), Listening ME (3), Contact ME (3), Responsibility ME (4), Rapport ME (4), Score: 24*” or “*S1: Greeting BE (0), Authenticate BE (0), Tone BE (0), Listening ME (3), Contact ME (3), Responsibility ME (4), Rapport BE (0), Score: 10. Say: ‘Thank you for calling Comcast, I’m Leo. How may I help?’*”.
+   - Silent (not passed to `speak`).
+
+4. **Customer Response**:
+   - Uses TTS via `speak(reply, ...)`, follows call flow exactly.
+
+5. **Start/End Button**:
+   - Toggles “Start Conversation” (green) and “End Conversation” (red).
+   - Ending triggers `resetSimulation`, displaying evaluations.
+
+6. **Turn Management**:
+   - `mic-btn` activates post-TTS via `startRec` in `speak`’s `onend`.
+   - `speaker-btn` red during TTS, off after.
+
+---
+
+### **Example Interaction**
+- **Agent**: “Thank you for calling Comcast, this is Leo speaking, may I have your first and last name please?”
+  - **Transcription (during role-play)**:
+    ```
+    Agent: Thank you for calling Comcast, this is Leo speaking, may I have your first and last name please.
+    Customer: Hello, this is Mark Smith.
+    ```
+  - **TTS**: “Hello, this is Mark Smith.”
+
+- **Agent**: “Hello Mark. How can I assist you today?”
+  - **Transcription**:
+    ```
+    Agent: Hello Mark. How can I assist you today?
+    Customer: My bill is doubled and I didn’t subscribe for any extra services. Would you check that for me?
+    ```
+  - **TTS**: “My bill is doubled…”
+
+- **Click “End Conversation”**:
+  - **Transcription**:
+    ```
+    Agent: Thank you for calling Comcast, this is Leo speaking, may I have your first and last name please.
+    Customer: Hello, this is Mark Smith.
+    Agent: Hello Mark. How can I assist you today?
+    Customer: My bill is doubled and I didn’t subscribe for any extra services. Would you check that for me?
+
+    Evaluation Summary:
+    Agent 1: Thank you for calling Comcast, this is Leo speaking, may I have your first and last name please.
+    *S1: Greeting ME (3), Authenticate HE (4), Tone ME (3), Listening ME (3), Contact ME (3), Responsibility ME (4), Rapport ME (4), Score: 24*
+    Agent 2: Hello Mark. How can I assist you today?
+    *S1: Reflect BE (0), Tone ME (3), Listening ME (3), Contact ME (3), Responsibility ME (4), Rapport ME (4), Score: 17. Say: ‘Thank you for calling Comcast, I’m Leo. How may I help?’*
+    ```
+
+---
+
+### **Testing Plan**
+Host locally (`npx http-server`) with `s4_guidelines.js` in the same directory. Test in Chrome at 06:09 AM EEST, May 28, 2025.
+
+1. **Setup**:
+   - Save both files.
+   - Open `index.html`, grant mic access.
+
+2. **Test Call Flow**:
+   - **Step 1**: Click “Start Conversation.”
+     - Verify: `start-btn` → “End Conversation” (red), `mic-btn` red, `#transcription` shows “Listening…”.
+   - **Step 2**: Say: “Thank you for calling Comcast, this is Leo speaking, may I have your first and last name please.”
+     - Verify: `#transcription` shows:
+       ```
+       Agent: Thank you for calling Comcast, this is Leo speaking, may I have your first and last name please.
+       Customer: Hello, this is Mark Smith.
+       ```
+     - TTS: “Hello, this is Mark Smith.”
+     - Confirm: No comments displayed.
+   - **Step 3**: Say: “Hello Mark. How can I assist you today?”
+     - Verify: `#transcription` adds:
+       ```
+       Agent: Hello Mark. How can I assist you today?
+       Customer: My bill is doubled and I didn’t subscribe for any extra services. Would you check that for me?
+       ```
+     - TTS: “My bill is doubled…”
+   - **Step 4**: Continue through the call flow (e.g., “I’m sorry for this inconvenience…” → “Yes, sure.”).
+   - **Step 5**: Test incorrect input (e.g., “Random text”).
+     - Verify: Customer says “I’m not sure how to respond…”, no comments.
+   - **Step 6**: Click “End Conversation.”
+     - Verify: `#transcription` appends evaluation summary with comments for all agent responses, state resets, `start-btn` → “Start Conversation.”
+
+3. **Test Comments**:
+   - Confirm comments appear only after “End Conversation”, are italicized, silent, 1-2 lines, with BE recommendations.
+   - Verify summary lists each agent response and its evaluation.
+
+4. **Test Turn Management**:
+   - Confirm `mic-btn` reactivates post-TTS.
+   - Check `speaker-btn` red during TTS, off after.
+
+5. **Test Auto-Send**:
+   - Wait 60 seconds or say “send,” verify message sends.
+
+6. **Test Errors**:
+   - Disconnect Wi-Fi, check retry in `#transcription`.
+   - Verify errors logged.
+
+---
+
+### **Troubleshooting**
+- **AI Wrong Response**:
+  - Check `sendMessage` hardcoded responses.
+  - Share `#transcription` output.
+- **Comments During Role-Play**:
+  - Confirm `evaluations` only displayed in `resetSimulation`.
+  - Share `#transcription` content.
+- **Comments in TTS**:
+  - Verify only `reply` passed to `speak`.
+  - Share spoken text.
+- **No Summary**:
+  - Check `evaluations` array in `resetSimulation`.
+  - Share console logs.
+
+Please test and confirm:
+- AI follows the exact call flow (e.g., “Hello, this is Mark Smith”).
+- `#transcription` shows only dialogue during role-play.
+- Evaluation summary appears only after “End Conversation”, with silent comments.
+- Customer responses use TTS correctly.
+
+Share console logs or issues (e.g., “Comments appeared during role-play”). I’ll fix any problems immediately!
