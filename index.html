@@ -3,12 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <title>AI Call Simulator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
   <style>
     body { font-family: sans-serif; padding: 2em; }
     #messages { border: 1px solid #ccc; padding: 1em; height: 200px; overflow-y: auto; margin-bottom: 1em; }
     #settings { margin-bottom: 1em; }
     .ai { color: blue; }
     .user { color: green; }
+    button { margin-right: 1em; padding: 0.5em 1em; }
+    #micBtn.active { background-color: #ff3333; color: white; }
+    #speakerBtn.active { background-color: #ff3333; color: white; }
+    #sendBtn { background-color: #4CAF50; color: white; }
+    #sendBtn:disabled { background-color: #cccccc; }
   </style>
 </head>
 <body>
@@ -21,51 +27,65 @@
     </label><br>
     <label>
       Silence Timeout (seconds):
-      <input type="number" id="timeoutSeconds" value="5" min="2" max="60">
+      <input type="number" id="timeoutSeconds" value="60" min="2" max="120">
     </label>
   </div>
 
   <div id="messages"></div>
-  <button id="startBtn">Start Conversation</button>
+  <button id="startBtn">Start Simulation</button>
+  <button id="sendBtn" disabled>Send</button>
+  <button id="micBtn" disabled>Microphone: Off</button>
+  <button id="speakerBtn" disabled>Speaker: Off</button>
 
   <script>
     const startBtn = document.getElementById("startBtn");
+    const sendBtn = document.getElementById("sendBtn");
+    const micBtn = document.getElementById("micBtn");
+    const speakerBtn = document.getElementById("speakerBtn");
     const autoSendCheckbox = document.getElementById("autoSendCheckbox");
     const timeoutSecondsInput = document.getElementById("timeoutSeconds");
     const messagesDiv = document.getElementById("messages");
 
     let recognition, autoSendTimer, collectedTranscript = "";
     let autoSendEnabled = true;
-    let autoSendDelay = 5000;
+    let autoSendDelay = 60000; // 60 seconds
 
     function appendMessage(who, text) {
       const msg = document.createElement("div");
       msg.className = who;
-      msg.textContent = who.toUpperCase() + ": " + text;
+      msg.innerHTML = DOMPurify.sanitize(who.toUpperCase() + ": " + text);
       messagesDiv.appendChild(msg);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
     function speak(text, callback) {
+      speakerBtn.classList.add("active");
+      speakerBtn.textContent = "Speaker: On";
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.onend = () => {
+        speakerBtn.classList.remove("active");
+        speakerBtn.textContent = "Speaker: Off";
         if (callback) callback();
       };
       speechSynthesis.speak(utterance);
     }
 
     function startRecognition() {
+      if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
+        appendMessage("ai", "Speech recognition not supported in this browser.");
+        return;
+      }
       collectedTranscript = "";
       recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
       recognition.lang = "en-US";
       recognition.interimResults = false;
-      recognition.continuous = false;
+      recognition.continuous = true;
 
       recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
+        const transcript = event.results[event.results.length - 1][0].transcript;
         appendMessage("user", transcript);
+        sendBtn.disabled = false;
 
-        // Check for manual "send" keyword
         if (transcript.toLowerCase().includes("send")) {
           clearTimeout(autoSendTimer);
           processUserInput(transcript.replace(/send/i, "").trim());
@@ -83,40 +103,92 @@
       };
 
       recognition.onerror = (e) => {
-        console.error("Speech error:", e.error);
+        appendMessage("ai", `Error: ${e.error}. Please try again.`);
+        stopRecognition();
       };
 
       recognition.onend = () => {
-        console.log("Recognition ended.");
+        if (recognition.isActive) {
+          recognition.start();
+        }
       };
 
+      recognition.isActive = true;
+      startBtn.disabled = true;
+      micBtn.disabled = false;
+      micBtn.classList.add("active");
+      micBtn.textContent = "Microphone: On";
+      sendBtn.disabled = true;
       recognition.start();
+    }
+
+    function stopRecognition() {
+      if (recognition) {
+        recognition.isActive = false;
+        recognition.stop();
+        clearTimeout(autoSendTimer);
+        startBtn.disabled = false;
+        micBtn.disabled = true;
+        micBtn.classList.remove("active");
+        micBtn.textContent = "Microphone: Off";
+        sendBtn.disabled = true;
+      }
+    }
+
+    async function generateAIResponse(text) {
+      try {
+        const response = await fetch('/api/grok', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+        const data = await response.json();
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        return data.response;
+      } catch (error) {
+        console.error('AI API Error:', error);
+        return "Sorry, I couldn't process your request. Please try again.";
+      }
     }
 
     function processUserInput(text) {
       if (!text) return;
       appendMessage("user", text);
       collectedTranscript = "";
+      sendBtn.disabled = true;
 
-      // Simulate AI thinking
-      const response = generateFakeAIResponse(text);
-      speak(response, () => {
-        startRecognition(); // Auto-restart mic after speaking
+      // Stop microphone during AI response
+      stopRecognition();
+
+      appendMessage("ai", "Thinking...");
+      generateAIResponse(text).then(response => {
+        const lastMessage = messagesDiv.lastChild;
+        if (lastMessage.textContent.startsWith("AI: Thinking...")) {
+          messagesDiv.removeChild(lastMessage);
+        }
+        speak(response, () => {
+          startRecognition(); // Restart microphone after AI speaks
+        });
+        appendMessage("ai", response);
       });
-      appendMessage("ai", response);
-    }
-
-    function generateFakeAIResponse(text) {
-      // Replace this with real API call
-      return "You said: " + text + ". That's interesting!";
     }
 
     startBtn.addEventListener("click", () => {
       startRecognition();
     });
 
+    sendBtn.addEventListener("click", () => {
+      clearTimeout(autoSendTimer);
+      processUserInput(collectedTranscript);
+    });
+
     autoSendCheckbox.addEventListener("change", (e) => {
       autoSendEnabled = e.target.checked;
+      if (!autoSendEnabled) {
+        clearTimeout(autoSendTimer);
+      }
     });
 
     timeoutSecondsInput.addEventListener("input", (e) => {
