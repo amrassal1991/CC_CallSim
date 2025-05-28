@@ -1,65 +1,68 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>AI Call Simulator</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Speech to Text Demo</title>
   <style>
-    body { font-family: sans-serif; padding: 2em; }
-    #messages { border: 1px solid #ccc; padding: 1em; height: 200px; overflow-y: auto; margin-bottom: 1em; }
-    #settings { margin-bottom: 1em; }
-    .ai { color: blue; }
-    .user { color: green; }
-    button { margin-right: 1em; padding: 0.5em 1em; }
-    #micBtn.active { background-color: #ff3333; color: white; }
-    #speakerBtn.active { background-color: #ff3333; color: white; }
-    #sendBtn { background-color: #4CAF50; color: white; }
-    #sendBtn:disabled, #startBtn:disabled, #stopBtn:disabled { background-color: #cccccc; }
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 2rem;
+    }
+    #mic {
+      font-size: 2rem;
+      background: red;
+      color: white;
+      border: none;
+      padding: 1rem;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    #output {
+      margin-top: 2rem;
+      font-size: 1.2rem;
+      min-height: 2rem;
+      color: #333;
+    }
   </style>
 </head>
 <body>
-  <h1>🧠 AI Call Simulator</h1>
-  
-  <div id="settings">
-    <label>
-      <input type="checkbox" id="autoSendCheckbox" checked>
-      Enable Auto-Send on Silence
-    </label><br>
-    <label>
-      Silence Timeout (seconds):
-      <input type="number" id="timeoutSeconds" value="60" min="2" max="120">
-    </label>
-  </div>
-
-  <div id="messages"></div>
-  <button id="startBtn">Start Simulation</button>
-  <button id="stopBtn" disabled>Stop Simulation</button>
-  <button id="sendBtn" disabled>Send</button>
-  <button id="micBtn" disabled>Microphone: Off</button>
-  <button id="speakerBtn" disabled>Speaker: Off</button>
+  <h1>🎤 Speak Something!</h1>
+  <button id="mic">🎙️</button>
+  <div id="output">(waiting for input...)</div>
 
   <script>
-    const startBtn = document.getElementById("startBtn");
-    const stopBtn = document.getElementById("stopBtn");
-    const sendBtn = document.getElementById("sendBtn");
-    const micBtn = document.getElementById("micBtn");
-    const speakerBtn = document.getElementById("speakerBtn");
-    const autoSendCheckbox = document.getElementById("autoSendCheckbox");
-    const timeoutSecondsInput = document.getElementById("timeoutSeconds");
-    const messagesDiv = document.getElementById("messages");
+    const micButton = document.getElementById('mic');
+    const output = document.getElementById('output');
 
-    let recognition, autoSendTimer, collectedTranscript = "";
-    let autoSendEnabled = true;
-    let autoSendDelay = 60000; // 60 seconds
-    let isSimulationActive = false;
+    let recognition;
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
 
-    function appendMessage(who, text) {
-      const msg = document.createElement("div");
-      msg.className = who;
-      msg.innerHTML = DOMPurify.sanitize(who.toUpperCase() + ": " + text);
-      messagesDiv.appendChild(msg);
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      recognition.onresult = function (event) {
+        const transcript = event.results[0][0].transcript;
+        output.textContent = "You said: " + transcript;
+      };
+
+      recognition.onerror = function (event) {
+        output.textContent = "Error: " + event.error;
+      };
+    } else {
+      output.textContent = "Speech recognition not supported in this browser.";
+      micButton.disabled = true;
     }
 
-    function speak(text, callback) {
-      speakerBtn.classList.add("active");
+    micButton.onclick = () => {
+      if (recognition) {
+        recognition.start();
+        output.textContent = "Listening...";
+      }
+    };
+  </script>
+</body>
+</html>
