@@ -14,7 +14,7 @@
     #micBtn.active { background-color: #ff3333; color: white; }
     #speakerBtn.active { background-color: #ff3333; color: white; }
     #sendBtn { background-color: #4CAF50; color: white; }
-    #sendBtn:disabled { background-color: #cccccc; }
+    #sendBtn:disabled, #startBtn:disabled, #stopBtn:disabled { background-color: #cccccc; }
   </style>
 </head>
 <body>
@@ -33,12 +33,14 @@
 
   <div id="messages"></div>
   <button id="startBtn">Start Simulation</button>
+  <button id="stopBtn" disabled>Stop Simulation</button>
   <button id="sendBtn" disabled>Send</button>
   <button id="micBtn" disabled>Microphone: Off</button>
   <button id="speakerBtn" disabled>Speaker: Off</button>
 
   <script>
     const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
     const sendBtn = document.getElementById("sendBtn");
     const micBtn = document.getElementById("micBtn");
     const speakerBtn = document.getElementById("speakerBtn");
@@ -49,6 +51,7 @@
     let recognition, autoSendTimer, collectedTranscript = "";
     let autoSendEnabled = true;
     let autoSendDelay = 60000; // 60 seconds
+    let isSimulationActive = false;
 
     function appendMessage(who, text) {
       const msg = document.createElement("div");
@@ -65,7 +68,7 @@
       utterance.onend = () => {
         speakerBtn.classList.remove("active");
         speakerBtn.textContent = "Speaker: Off";
-        if (callback) callback();
+        if (callback && isSimulationActive) callback();
       };
       speechSynthesis.speak(utterance);
     }
@@ -103,31 +106,64 @@
       };
 
       recognition.onerror = (e) => {
-        appendMessage("ai", `Error: ${e.error}. Please try again.`);
-        stopRecognition();
-      };
-
-      recognition.onend = () => {
-        if (recognition.isActive) {
-          recognition.start();
+        let errorMessage = "";
+        switch (e.error) {
+          case "network":
+            errorMessage = "Network error: Please check your internet connection and try again.";
+            break;
+          case "no-speech":
+            errorMessage = "No speech detected. Please speak clearly and try again.";
+            break;
+          case "not-allowed":
+            errorMessage = "Microphone access denied. Please allow microphone access.";
+            break;
+          default:
+            errorMessage = `Speech recognition error: ${e.error}. Please try again.`;
+        }
+        appendMessage("ai", errorMessage);
+        if (isSimulationActive) {
+          setTimeout(() => {
+            appendMessage("ai", "Attempting to restart microphone...");
+            startRecognition();
+          }, 3000); // Retry after 3 seconds
         }
       };
 
-      recognition.isActive = true;
-      startBtn.disabled = true;
-      micBtn.disabled = false;
-      micBtn.classList.add("active");
-      micBtn.textContent = "Microphone: On";
-      sendBtn.disabled = true;
-      recognition.start();
+      recognition.onend = () => {
+        if (isSimulationActive && recognition.isActive) {
+          try {
+            recognition.start();
+          } catch (e) {
+            appendMessage("ai", "Failed to restart microphone. Please click 'Start Simulation' again.");
+            stopRecognition();
+          }
+        }
+      };
+
+      try {
+        recognition.isActive = true;
+        isSimulationActive = true;
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        micBtn.disabled = false;
+        micBtn.classList.add("active");
+        micBtn.textContent = "Microphone: On";
+        sendBtn.disabled = true;
+        recognition.start();
+      } catch (e) {
+        appendMessage("ai", "Microphone access denied. Please allow microphone access.");
+        stopRecognition();
+      }
     }
 
     function stopRecognition() {
       if (recognition) {
         recognition.isActive = false;
+        isSimulationActive = false;
         recognition.stop();
         clearTimeout(autoSendTimer);
         startBtn.disabled = false;
+        stopBtn.disabled = true;
         micBtn.disabled = true;
         micBtn.classList.remove("active");
         micBtn.textContent = "Microphone: Off";
@@ -160,7 +196,12 @@
       sendBtn.disabled = true;
 
       // Stop microphone during AI response
-      stopRecognition();
+      if (recognition) {
+        recognition.isActive = false;
+        recognition.stop();
+        micBtn.classList.remove("active");
+        micBtn.textContent = "Microphone: Off";
+      }
 
       appendMessage("ai", "Thinking...");
       generateAIResponse(text).then(response => {
@@ -169,7 +210,9 @@
           messagesDiv.removeChild(lastMessage);
         }
         speak(response, () => {
-          startRecognition(); // Restart microphone after AI speaks
+          if (isSimulationActive) {
+            startRecognition(); // Restart microphone after AI speaks
+          }
         });
         appendMessage("ai", response);
       });
@@ -177,6 +220,10 @@
 
     startBtn.addEventListener("click", () => {
       startRecognition();
+    });
+
+    stopBtn.addEventListener("click", () => {
+      stopRecognition();
     });
 
     sendBtn.addEventListener("click", () => {
