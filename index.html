@@ -39,16 +39,6 @@
       font-size: 14px;
     }
 
-    #transcript {
-      border: 1px solid #ddd;
-      padding: 15px;
-      margin: 15px 0;
-      min-height: 60px;
-      text-align: left;
-      background: #fefefe;
-      border-radius: 8px;
-    }
-
     button {
       padding: 12px 20px;
       margin: 10px;
@@ -95,9 +85,6 @@
     <button id="speaker-btn" disabled>Speaker: Off</button>
     <div id="loader">⏳ AI is thinking...</div>
 
-    <h3>Agent Said:</h3>
-    <div id="transcript">—</div>
-
     <h3>Call Transcription:</h3>
     <div id="transcription">—</div>
   </div>
@@ -105,19 +92,18 @@
   <script type="module">
     import { evaluateS4Response } from './s4_guidelines.js';
 
-    const WORKER_URL = 'https://workers-playground-tiny-sky-62.workers.dev';
+    const WORKER_URL = 'https://workers-playground-tiny-sky-5f02.amrassal91.workers.dev';
 
     const startBtn = document.getElementById('start-btn');
     const sendBtn = document.getElementById('send-btn');
     const micBtn = document.getElementById('mic-btn');
     const speakerBtn = document.getElementById('speaker-btn');
     const loader = document.getElementById('loader');
-    const transcriptEl = document.getElementById('transcript');
     const transcriptionEl = document.getElementById('transcription');
     const autoSendCheckbox = document.getElementById('autoSendCheckbox');
     const timeoutSecondsInput = document.getElementById('timeoutSeconds');
 
-    let recognition = null, finalTranscript = '', isListening = false;
+    let recognition, finalTranscript = '', isRecognizing = false;
     let autoSendEnabled = true;
     let autoSendDelay = 60000;
     let autoSendTimer;
@@ -137,10 +123,10 @@
       rec.continuous = true;
 
       rec.onstart = () => {
-        isListening = true;
-        transcriptEl.textContent = 'Listening...';
+        isRecognizing = true;
+        micBtn.disabled = false;
         micBtn.classList.add('active');
-        micBtn.textContent = 'Microphone: Active';
+        micBtn.textContent = 'Microphone: On';
       };
 
       rec.onresult = e => {
@@ -158,7 +144,7 @@
             interim = t;
           }
         }
-        transcriptEl.textContent = finalTranscript + interim;
+        transcriptionEl.innerHTML = transcriptionEl.innerHTML.replace(/Listening\.\.\.$/, '') + `Agent: ${finalTranscript + interim}<br>`;
         sendBtn.disabled = !finalTranscript.trim();
 
         if (autoSendEnabled && finalTranscript.trim()) {
@@ -170,23 +156,18 @@
       };
 
       rec.onerror = e => {
-        let errorMsg = '';
-        if (e.error === 'network') {
-          errorMsg = 'Network error. Retrying in 3 seconds...';
-        } else {
-          errorMsg = `Speech error: ${e.error}`;
-        }
-        transcriptEl.textContent = errorMsg;
-        console.error('Error:', e.error);
-        if (isListening) {
+        let errorMessage = e.error === 'network' ? 'Network error. Retrying in 3 seconds...' : `Speech error: ${e.error}`;
+        transcriptionEl.innerHTML += `<b>Error:</b> ${errorMessage}<br>`;
+        console.error('Speech error:', e.error);
+        if (isRecognizing) {
           setTimeout(() => {
-            if (isListening) startRec();
+            if (isRecognizing) startRec();
           }, 3000);
         }
       };
 
       rec.onend = () => {
-        if (!isListening) {
+        if (!isRecognizing) {
           micBtn.classList.remove('active');
           micBtn.textContent = 'Microphone: Off';
           micBtn.disabled = true;
@@ -200,39 +181,42 @@
     function startRec() {
       if (!recognition) recognition = initRecognition();
       finalTranscript = '';
-      transcriptEl.textContent = '';
+      transcriptionEl.innerHTML += 'Listening...<br>';
+      sendBtn.disabled = true;
       try {
         recognition.start();
       } catch (e) {
-        transcriptEl.textContent = 'Microphone access denied.';
+        transcriptionEl.innerHTML += '<b>Error:</b> Microphone access denied.<br>';
         stopRec();
       }
     }
 
     function stopRec() {
-      if (recognition && isListening) {
+      if (recognition && isRecognizing) {
         recognition.stop();
-        isListening = false;
+        isRecognizing = false;
         clearTimeout(autoSendTimer);
       }
     }
 
     async function sendMessage(text) {
-      if (!text || !isConversationActive) return;
+      if (!text || !isSimulationActive) return;
       stopRec();
       sendBtn.disabled = true;
       loader.style.display = 'block';
       speakerBtn.disabled = false;
       speakerBtn.classList.add('active');
-      speakerBtn.textContent = 'Speaker: Active';
+      speakerBtn.textContent = 'Speaker: On';
 
-      transcriptionEl.innerHTML += `<b>Agent:</b> ${text}<br>`;
+      transcriptionEl.innerHTML = transcriptionEl.innerHTML.replace(/Listening\.\.\.$/, '') + `<b>Agent:</b> ${text}<br>`;
 
       try {
+        // Evaluate agent response
         const evaluation = evaluateS4Response(text, callStage, conversationHistory);
         transcriptionEl.innerHTML += `${evaluation.comment}<br>`;
         conversationHistory.push({ role: 'agent', content: text });
 
+        // Generate customer response
         let reply = '';
         const lowerText = text.toLowerCase();
         if (conversationHistory.length === 1) {
@@ -247,7 +231,7 @@
           reply = 'Thank you.';
         } else if (lowerText.match(/reason for the increase/i)) {
           reply = 'Thank you so much. That’s appreciated.';
-        } else if (lowerText.match(/fixed the account.*200/i)) {
+        } else if (lowerText.match(/fixed.*200/i)) {
           reply = 'No, that’s all of it.';
         } else if (lowerText.match(/mobile.*discount/i)) {
           reply = 'Yeah, that looks like a good offer, so please schedule the callback for tomorrow at 2:00 PM Eastern Time.';
@@ -265,7 +249,7 @@ You are a Comcast postpaid small to medium business customer named Mark Smith. R
 - Agent: "Fixed... $200" → "No, that’s all of it."
 - Agent: "Mobile... discount" → "Yeah, that looks like a good offer..."
 - Agent: "Schedule callback" → "No, that is all of it."
-For agent input: "${text}", respond in character with a short, natural reply. Call stage: ${callStage}. History: ${JSON.stringify(conversationHistory)}.`;
+For agent input: "${text}", respond in character with a short reply. Call stage: ${callStage}. History: ${JSON.stringify(conversationHistory)}.`;
           const payload = { contents: [{ parts: [{ text: prompt }] }] };
           const res = await fetch(WORKER_URL, {
             method: 'POST',
@@ -280,6 +264,7 @@ For agent input: "${text}", respond in character with a short, natural reply. Ca
         conversationHistory.push({ role: 'customer', content: reply });
         transcriptionEl.scrollTop = transcriptionEl.scrollHeight;
 
+        // Update call stage
         if (callStage === 'S1' && lowerText.match(/fixed|corrected/i)) {
           callStage = 'S2';
         } else if (callStage === 'S2' && lowerText.match(/offer|discount/i)) {
@@ -289,13 +274,13 @@ For agent input: "${text}", respond in character with a short, natural reply. Ca
         }
 
         speak(reply, () => {
-          if (isConversationActive) startRec();
+          if (isSimulationActive) startRec();
         });
       } catch (e) {
         transcriptionEl.innerHTML += `<b>Error:</b> ${e.message}<br>`;
         console.error('Fetch failed:', e);
         speak('Error: Unable to respond.', () => {
-          if (isConversationActive) startRec();
+          if (isSimulationActive) startRec();
         });
       } finally {
         loader.style.display = 'none';
@@ -320,13 +305,12 @@ For agent input: "${text}", respond in character with a short, natural reply. Ca
       window.speechSynthesis.speak(utter);
     }
 
-    function resetConversation() {
+    function resetSimulation() {
       stopRec();
-      isConversationActive = false;
+      isSimulationActive = false;
       callStage = 'S1';
       conversationHistory = [];
       transcriptionEl.innerHTML = '—';
-      transcriptEl.textContent = '—';
       startBtn.textContent = '🎤 Start Conversation';
       startBtn.classList.remove('active');
       sendBtn.disabled = true;
@@ -335,10 +319,10 @@ For agent input: "${text}", respond in character with a short, natural reply. Ca
     }
 
     startBtn.addEventListener('click', () => {
-      if (isConversationActive) {
-        resetConversation();
+      if (isSimulationActive) {
+        resetSimulation();
       } else {
-        isConversationActive = true;
+        isSimulationActive = true;
         startBtn.textContent = '🛑 End Conversation';
         startBtn.classList.add('active');
         transcriptionEl.innerHTML = '';
