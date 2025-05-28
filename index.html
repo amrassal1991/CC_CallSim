@@ -27,7 +27,7 @@
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
     }
 
-    #transcript, #ai-response, #evaluation {
+    #transcription, #ai-response, #transcript {
       border: 1px solid #ddd;
       padding: 15px;
       margin: 15px 0;
@@ -36,6 +36,11 @@
       background: #fefefe;
       border-radius: 8px;
       overflow-y: auto;
+    }
+
+    #transcription {
+      max-height: 300px;
+      font-size: 14px;
     }
 
     button {
@@ -47,6 +52,7 @@
       cursor: pointer;
     }
 
+    #start-btn.active { background-color: #ff3333; color: white; }
     #start-btn { background-color: #4CAF50; color: white; }
     #send-btn { background-color: #2196F3; color: white; }
     #mic-btn.active { background-color: #ff3333; color: white; }
@@ -77,7 +83,7 @@
         <input type="number" id="timeoutSeconds" value="60" min="2" max="120">
       </label>
     </div>
-    <button id="start-btn">🎤 Start Listening</button>
+    <button id="start-btn">🎤 Start Conversation</button>
     <button id="send-btn" disabled>✉️ Send</button>
     <button id="mic-btn" disabled>Microphone: Off</button>
     <button id="speaker-btn" disabled>Speaker: Off</button>
@@ -89,8 +95,8 @@
     <h3>Customer (AI) Said:</h3>
     <div id="ai-response">—</div>
 
-    <h3>S4 Evaluation:</h3>
-    <div id="evaluation">—</div>
+    <h3>Call Transcription:</h3>
+    <div id="transcription">—</div>
   </div>
 
   <script type="module">
@@ -105,7 +111,7 @@
     const loader = document.getElementById('loader');
     const transcriptEl = document.getElementById('transcript');
     const aiResponseEl = document.getElementById('ai-response');
-    const evaluationEl = document.getElementById('evaluation');
+    const transcriptionEl = document.getElementById('transcription');
     const autoSendCheckbox = document.getElementById('autoSendCheckbox');
     const timeoutSecondsInput = document.getElementById('timeoutSeconds');
 
@@ -115,6 +121,7 @@
     let autoSendTimer;
     let callStage = 'S1';
     let conversationHistory = [];
+    let isSimulationActive = false;
 
     function initRecognition() {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -129,7 +136,6 @@
 
       rec.onstart = () => {
         isRecognizing = true;
-        startBtn.textContent = '🛑 Stop';
         transcriptEl.textContent = 'Listening...';
         micBtn.disabled = false;
         micBtn.classList.add('active');
@@ -182,7 +188,6 @@
 
       rec.onend = () => {
         if (!isRecognizing) {
-          startBtn.textContent = '🎤 Start Listening';
           micBtn.classList.remove('active');
           micBtn.textContent = 'Microphone: Off';
           micBtn.disabled = true;
@@ -215,54 +220,92 @@
     }
 
     async function sendMessage(text) {
-      if (!text) return;
+      if (!text || !isSimulationActive) return;
       stopRec();
       sendBtn.disabled = true;
       loader.style.display = 'block';
       aiResponseEl.textContent = '';
-      evaluationEl.textContent = '';
       speakerBtn.disabled = false;
       speakerBtn.classList.add('active');
       speakerBtn.textContent = 'Speaker: On';
 
+      // Add agent message to transcription
+      transcriptionEl.innerHTML += `<b>Agent:</b> ${text}<br>`;
+
       try {
         // Evaluate agent response
         const evaluation = evaluateS4Response(text, callStage, conversationHistory);
-        evaluationEl.innerHTML = evaluation.comment + `<br><b>Score:</b> ${evaluation.score} points`;
+        transcriptionEl.innerHTML += evaluation.comment + `<i><b>Score:</b> ${evaluation.score} points</i><br>`;
         conversationHistory.push({ role: 'agent', content: text });
 
-        // Generate customer response
-        const prompt = `
-You are a Comcast postpaid small to medium business customer with TV, landline, or Internet service. You have a concern about billing (e.g., overcharge) or technical support (e.g., Internet outage). Respond ONLY as the customer, never as an agent. Use a natural, conversational tone, reflecting emotions like frustration or relief based on the agent’s response: "${text}". Provide account details (e.g., address, account number) if asked for verification. Acknowledge resolutions or express dissatisfaction if unresolved. Current call stage: ${callStage}. Conversation history: ${JSON.stringify(conversationHistory)}. Start with a greeting if this is the first response (e.g., "Hi, this is Mark Smith from ABC Corp. My bill doubled this month!").`;
-        const payload = { contents: [{ parts: [{ text: prompt }] }] };
-        const res = await fetch(WORKER_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        // Generate customer response based on example flow
+        let reply = '';
+        const lowerText = text.toLowerCase();
+        if (conversationHistory.length === 1) {
+          reply = 'Hello, this is Mark Smith.';
+        } else if (lowerText.match(/how can i assist/i)) {
+          reply = 'My bill is doubled and I didn’t subscribe for any extra services. Would you check that for me?';
+        } else if (lowerText.match(/verify your account/i)) {
+          reply = 'Yes, sure.';
+        } else if (lowerText.match(/provide.*account number|address|telephone/i)) {
+          reply = 'Sure, my service address is 15 Northwest St, Ohio, 13557. My account number is 891700588128567. And my telephone number is 636-554-8121.';
+        } else if (lowerText.match(/checking your bill/i)) {
+          reply = 'Thank you.';
+        } else if (lowerText.match(/reason for the increase/i)) {
+          reply = 'Thank you so much. That’s appreciated.';
+        } else if (lowerText.match(/fixed the account.*200/i)) {
+          reply = 'No, that’s all of it.';
+        } else if (lowerText.match(/mobile.*discount/i)) {
+          reply = 'Yeah, that looks like a good offer, so please schedule the callback for tomorrow at 2:00 PM Eastern Time.';
+        } else if (lowerText.match(/schedule.*callback/i)) {
+          reply = 'No, that is all of it.';
+        } else {
+          // Fallback to Gemini API for dynamic responses
+          const prompt = `
+You are a Comcast postpaid small to medium business customer named Mark Smith. Respond ONLY as the customer, never as an agent. Follow the exact call flow from this example:
+- Agent: "Thank you for contacting Comcast..." → You: "Hello, this is Mark Smith."
+- Agent: "How can I assist..." → You: "My bill is doubled..."
+- Agent: "Verify your account" → You: "Yes, sure."
+- Agent: "Provide account number..." → You: "Sure, my service address is 15 Northwest St..."
+- Agent: "Checking your bill" → You: "Thank you."
+- Agent: "Reason for increase" → You: "Thank you so much. That’s appreciated."
+- Agent: "Fixed... $200" → You: "No, that’s all of it."
+- Agent: "Mobile... discount" → You: "Yeah, that looks like a good offer..."
+- Agent: "Schedule callback" → You: "No, that is all of it."
+For the agent’s input: "${text}", respond naturally in character, reflecting emotions (e.g., frustration, relief). Current call stage: ${callStage}. Conversation history: ${JSON.stringify(conversationHistory)}.`;
+          const payload = { contents: [{ parts: [{ text: prompt }] }] };
+          const res = await fetch(WORKER_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '(No response)';
+        }
 
-        const data = await res.json();
-        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '(No response)';
         aiResponseEl.textContent = reply;
+        transcriptionEl.innerHTML += `<b>Customer:</b> ${reply}<br>`;
         conversationHistory.push({ role: 'customer', content: reply });
+        transcriptionEl.scrollTop = transcriptionEl.scrollHeight;
 
         // Update call stage
-        if (callStage === 'S1' && text.match(/(fixed|resolved|take care of)/i)) {
+        if (callStage === 'S1' && lowerText.match(/fixed|corrected/i)) {
           callStage = 'S2';
-        } else if (callStage === 'S2' && text.match(/(review your account|best value)/i)) {
+        } else if (callStage === 'S2' && lowerText.match(/offer|discount/i)) {
           callStage = 'S3';
-        } else if (callStage === 'S3' && text.match(/(recap|next steps)/i)) {
+        } else if (callStage === 'S3' && lowerText.match(/anything else|lovely day/i)) {
           callStage = 'S4';
         }
 
         speak(reply, () => {
-          startRec();
+          if (isSimulationActive) startRec();
         });
       } catch (e) {
         aiResponseEl.textContent = 'AI Error: ' + e.message;
+        transcriptionEl.innerHTML += `<b>Error:</b> ${e.message}<br>`;
         console.error('Fetch failed:', e);
         speak('Error: Unable to get AI response.', () => {
-          startRec();
+          if (isSimulationActive) startRec();
         });
       } finally {
         loader.style.display = 'none';
@@ -287,8 +330,36 @@ You are a Comcast postpaid small to medium business customer with TV, landline, 
       window.speechSynthesis.speak(utter);
     }
 
+    function resetSimulation() {
+      stopRec();
+      isSimulationActive = false;
+      callStage = 'S1';
+      conversationHistory = [];
+      transcriptionEl.innerHTML = '—';
+      aiResponseEl.textContent = '—';
+      transcriptEl.textContent = '—';
+      startBtn.textContent = '🎤 Start Conversation';
+      startBtn.classList.remove('active');
+      sendBtn.disabled = true;
+      micBtn.disabled = true;
+      speakerBtn.disabled = true;
+    }
+
     startBtn.addEventListener('click', () => {
-      isRecognizing ? stopRec() : startRec();
+      if (isSimulationActive) {
+        resetSimulation();
+      } else {
+        isSimulationActive = true;
+        startBtn.textContent = '🛑 End Simulation';
+        startBtn.classList.add('active');
+        startRec();
+        // Initiate conversation
+        const initialReply = 'Hello, this is Mark Smith.';
+        aiResponseEl.textContent = initialReply;
+        transcriptionEl.innerHTML = `<b>Customer:</b> ${initialReply}<br>`;
+        conversationHistory.push({ role: 'customer', content: initialReply });
+        speak(initialReply, startRec);
+      }
     });
 
     sendBtn.addEventListener('click', () => {
