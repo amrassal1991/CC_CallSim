@@ -3,39 +3,77 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Call Simulator PWA</title>
-  <link rel="manifest" href="manifest.json" />
+  <title>Call Simulator</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-    #transcript, #ai-response { margin: 20px auto; padding: 10px; border: 1px solid #ccc; width: 90%; max-width: 600px; min-height: 60px; overflow-y: auto; }
-    button { margin: 10px; padding: 10px 20px; font-size: 16px; }
-    #loader { display: none; margin-top: 10px; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f5f7fa;
+      color: #333;
+      padding: 20px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 2em;
+      color: #444;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    #transcript, #ai-response {
+      border: 1px solid #ddd;
+      padding: 15px;
+      margin: 15px 0;
+      min-height: 60px;
+      text-align: left;
+      background: #fefefe;
+      border-radius: 8px;
+      overflow-y: auto;
+    }
+
+    button {
+      padding: 12px 20px;
+      margin: 10px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    #start-btn { background-color: #4CAF50; color: white; }
+    #send-btn { background-color: #2196F3; color: white; }
+
+    #loader {
+      display: none;
+      margin: 10px;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
-  <h1>Call Simulator (PWA)</h1>
-  <button id="start-btn">🎤 Start Listening</button>
-  <button id="send-btn" disabled>✉️ Send</button>
-  <div id="loader">⏳ Processing...</div>
+  <div class="container">
+    <h1>Call Simulator 🎧</h1>
+    <button id="start-btn">🎤 Start Listening</button>
+    <button id="send-btn" disabled>✉️ Send</button>
+    <div id="loader">⏳ AI is thinking...</div>
 
-  <div>
     <h3>You Said:</h3>
     <div id="transcript">—</div>
-  </div>
-  <div>
+
     <h3>Customer (AI) Said:</h3>
     <div id="ai-response">—</div>
   </div>
 
   <script>
-    // Register service worker for PWA
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js')
-        .then(() => console.log('Service Worker registered'))
-        .catch(err => console.error('SW registration failed:', err));
-    }
-
     const WORKER_URL = 'https://workers-playground-tiny-sky-5f02.amrassal91.workers.dev';
+
     const startBtn = document.getElementById('start-btn');
     const sendBtn = document.getElementById('send-btn');
     const loader = document.getElementById('loader');
@@ -44,13 +82,23 @@
 
     let recognition, finalTranscript = '', isRecognizing = false;
 
-    // Initialize Speech Recognition
     function initRecognition() {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SR) { alert('Speech Recognition not supported.'); return null; }
+      if (!SR) {
+        alert('Speech recognition not supported.');
+        return null;
+      }
       const rec = new SR();
-      rec.lang = 'en-US'; rec.interimResults = true; rec.continuous = true;
-      rec.onstart = () => { isRecognizing = true; startBtn.textContent = '🛑 Stop'; startBtn.disabled = false; transcriptEl.textContent = 'Listening...'; };
+      rec.lang = 'en-US';
+      rec.interimResults = true;
+      rec.continuous = true;
+
+      rec.onstart = () => {
+        isRecognizing = true;
+        startBtn.textContent = '🛑 Stop';
+        transcriptEl.textContent = 'Listening...';
+      };
+
       rec.onresult = e => {
         let interim = '';
         for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -59,67 +107,70 @@
           else interim += t;
         }
         transcriptEl.textContent = finalTranscript + interim;
-        sendBtn.disabled = !(finalTranscript.trim());
+        sendBtn.disabled = !finalTranscript.trim();
       };
-      rec.onerror = e => { transcriptEl.textContent = 'Error: ' + e.error; stopRec(); };
-      rec.onend = () => { isRecognizing = false; startBtn.textContent = '🎤 Start Listening'; };
+
+      rec.onerror = e => {
+        console.error('Speech error:', e.error);
+        transcriptEl.textContent = 'Error: ' + e.error;
+        stopRec();
+      };
+
+      rec.onend = () => {
+        isRecognizing = false;
+        startBtn.textContent = '🎤 Start Listening';
+      };
+
       return rec;
     }
 
     function startRec() {
       if (!recognition) recognition = initRecognition();
-      finalTranscript = ''; transcriptEl.textContent = ''; sendBtn.disabled = true; recognition.start();
+      finalTranscript = '';
+      transcriptEl.textContent = '';
+      sendBtn.disabled = true;
+      recognition.start();
     }
+
     function stopRec() {
       if (recognition && isRecognizing) recognition.stop();
     }
 
     startBtn.addEventListener('click', () => {
-      startBtn.disabled = true;
       isRecognizing ? stopRec() : startRec();
-      setTimeout(() => startBtn.disabled = false, 500);
     });
 
-    // Fetch with retry logic
-    async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
-      for (let i = 0; i < retries; i++) {
-        try {
-          const res = await fetch(url, options);
-          if (!res.ok) {
-            const errBody = await res.json().catch(() => ({}));
-            throw new Error(`HTTP ${res.status}: ${JSON.stringify(errBody)}`);
-          }
-          return res;
-        } catch (err) {
-          if (i === retries - 1) throw err;
-          await new Promise(r => setTimeout(r, delay));
-        }
-      }
-    }
-
     sendBtn.addEventListener('click', async () => {
-      stopRec(); sendBtn.disabled = true; loader.style.display = 'block'; aiResponseEl.textContent = '';
+      stopRec();
+      sendBtn.disabled = true;
+      loader.style.display = 'block';
+      aiResponseEl.textContent = '';
+
       try {
         const payload = { contents: [{ parts: [{ text: finalTranscript.trim() }] }] };
-        const res = await fetchWithRetry(WORKER_URL, {
-          method: 'POST', mode: 'cors', headers: { 'Content-Type': 'application/json' },
+        const res = await fetch(WORKER_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
+
         const data = await res.json();
         const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '(No response)';
-        aiResponseEl.textContent = reply; speak(reply);
+        aiResponseEl.textContent = reply;
+        speak(reply);
       } catch (e) {
         aiResponseEl.textContent = 'AI Error: ' + e.message;
-        console.error('Fetch error:', e);
+        console.error('Fetch failed:', e);
       } finally {
         loader.style.display = 'none';
       }
     });
 
-    function speak(txt) {
+    function speak(text) {
       if (!window.speechSynthesis) return;
-      const u = new SpeechSynthesisUtterance(txt);
-      u.lang = 'en-US'; window.speechSynthesis.speak(u);
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'en-US';
+      window.speechSynthesis.speak(utter);
     }
   </script>
 </body>
