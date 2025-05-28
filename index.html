@@ -2,67 +2,125 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Speech to Text Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Call Simulator PWA</title>
+  <link rel="manifest" href="manifest.json" />
   <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      padding: 2rem;
-    }
-    #mic {
-      font-size: 2rem;
-      background: red;
-      color: white;
-      border: none;
-      padding: 1rem;
-      border-radius: 50%;
-      cursor: pointer;
-    }
-    #output {
-      margin-top: 2rem;
-      font-size: 1.2rem;
-      min-height: 2rem;
-      color: #333;
-    }
+    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+    #transcript, #ai-response { margin: 20px auto; padding: 10px; border: 1px solid #ccc; width: 90%; max-width: 600px; min-height: 60px; overflow-y: auto; }
+    button { margin: 10px; padding: 10px 20px; font-size: 16px; }
+    #loader { display: none; margin-top: 10px; }
   </style>
 </head>
 <body>
-  <h1>🎤 Speak Something!</h1>
-  <button id="mic">🎙️</button>
-  <div id="output">(waiting for input...)</div>
+  <h1>Call Simulator (PWA)</h1>
+  <button id="start-btn">🎤 Start Listening</button>
+  <button id="send-btn" disabled>✉️ Send</button>
+  <div id="loader">⏳ Processing...</div>
+
+  <div>
+    <h3>You Said:</h3>
+    <div id="transcript">—</div>
+  </div>
+  <div>
+    <h3>Customer (AI) Said:</h3>
+    <div id="ai-response">—</div>
+  </div>
 
   <script>
-    const micButton = document.getElementById('mic');
-    const output = document.getElementById('output');
-
-    let recognition;
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
-
-      recognition.onresult = function (event) {
-        const transcript = event.results[0][0].transcript;
-        output.textContent = "You said: " + transcript;
-      };
-
-      recognition.onerror = function (event) {
-        output.textContent = "Error: " + event.error;
-      };
-    } else {
-      output.textContent = "Speech recognition not supported in this browser.";
-      micButton.disabled = true;
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js')
+        .then(() => console.log('Service Worker registered'))
+        .catch(err => console.error('SW registration failed:', err));
     }
 
-    micButton.onclick = () => {
-      if (recognition) {
-        recognition.start();
-        output.textContent = "Listening...";
+    const WORKER_URL = 'https://workers-playground-tiny-sky-5f02.amrassal91.workers.dev';
+    const startBtn = document.getElementById('start-btn');
+    const sendBtn = document.getElementById('send-btn');
+    const loader = document.getElementById('loader');
+    const transcriptEl = document.getElementById('transcript');
+    const aiResponseEl = document.getElementById('ai-response');
+
+    let recognition, finalTranscript = '', isRecognizing = false;
+
+    // Initialize Speech Recognition
+    function initRecognition() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) { alert('Speech Recognition not supported.'); return null; }
+      const rec = new SR();
+      rec.lang = 'en-US'; rec.interimResults = true; rec.continuous = true;
+      rec.onstart = () => { isRecognizing = true; startBtn.textContent = '🛑 Stop'; startBtn.disabled = false; transcriptEl.textContent = 'Listening...'; };
+      rec.onresult = e => {
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const t = e.results[i][0].transcript;
+          if (e.results[i].isFinal) finalTranscript += t + ' ';
+          else interim += t;
+        }
+        transcriptEl.textContent = finalTranscript + interim;
+        sendBtn.disabled = !(finalTranscript.trim());
+      };
+      rec.onerror = e => { transcriptEl.textContent = 'Error: ' + e.error; stopRec(); };
+      rec.onend = () => { isRecognizing = false; startBtn.textContent = '🎤 Start Listening'; };
+      return rec;
+    }
+
+    function startRec() {
+      if (!recognition) recognition = initRecognition();
+      finalTranscript = ''; transcriptEl.textContent = ''; sendBtn.disabled = true; recognition.start();
+    }
+    function stopRec() {
+      if (recognition && isRecognizing) recognition.stop();
+    }
+
+    startBtn.addEventListener('click', () => {
+      startBtn.disabled = true;
+      isRecognizing ? stopRec() : startRec();
+      setTimeout(() => startBtn.disabled = false, 500);
+    });
+
+    // Fetch with retry logic
+    async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
+      for (let i = 0; i < retries; i++) {
+        try {
+          const res = await fetch(url, options);
+          if (!res.ok) {
+            const errBody = await res.json().catch(() => ({}));
+            throw new Error(`HTTP ${res.status}: ${JSON.stringify(errBody)}`);
+          }
+          return res;
+        } catch (err) {
+          if (i === retries - 1) throw err;
+          await new Promise(r => setTimeout(r, delay));
+        }
       }
-    };
+    }
+
+    sendBtn.addEventListener('click', async () => {
+      stopRec(); sendBtn.disabled = true; loader.style.display = 'block'; aiResponseEl.textContent = '';
+      try {
+        const payload = { contents: [{ parts: [{ text: finalTranscript.trim() }] }] };
+        const res = await fetchWithRetry(WORKER_URL, {
+          method: 'POST', mode: 'cors', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '(No response)';
+        aiResponseEl.textContent = reply; speak(reply);
+      } catch (e) {
+        aiResponseEl.textContent = 'AI Error: ' + e.message;
+        console.error('Fetch error:', e);
+      } finally {
+        loader.style.display = 'none';
+      }
+    });
+
+    function speak(txt) {
+      if (!window.speechSynthesis) return;
+      const u = new SpeechSynthesisUtterance(txt);
+      u.lang = 'en-US'; window.speechSynthesis.speak(u);
+    }
   </script>
 </body>
 </html>
