@@ -3,18 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <title>AI Call Simulator</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
   <style>
     body { font-family: sans-serif; padding: 2em; }
     #messages { border: 1px solid #ccc; padding: 1em; height: 200px; overflow-y: auto; margin-bottom: 1em; }
     #settings { margin-bottom: 1em; }
     .ai { color: blue; }
     .user { color: green; }
-    button { margin-right: 1em; padding: 0.5em 1em; }
-    #micBtn.active { background-color: #ff3333; color: white; }
-    #speakerBtn.active { background-color: #ff3333; color: white; }
-    #sendBtn { background-color: #4CAF50; color: white; }
-    #sendBtn:disabled, #startBtn:disabled, #stopBtn:disabled { background-color: #cccccc; }
   </style>
 </head>
 <body>
@@ -27,68 +21,51 @@
     </label><br>
     <label>
       Silence Timeout (seconds):
-      <input type="number" id="timeoutSeconds" value="60" min="2" max="120">
+      <input type="number" id="timeoutSeconds" value="5" min="2" max="60">
     </label>
   </div>
 
   <div id="messages"></div>
-  <button id="startBtn">Start Simulation</button>
-  <button id="stopBtn" disabled>Stop Simulation</button>
-  <button id="sendBtn" disabled>Send</button>
-  <button id="micBtn" disabled>Microphone: Off</button>
-  <button id="speakerBtn" disabled>Speaker: Off</button>
+  <button id="startBtn">Start Conversation</button>
 
   <script>
     const startBtn = document.getElementById("startBtn");
-    const stopBtn = document.getElementById("stopBtn");
-    const sendBtn = document.getElementById("sendBtn");
-    const micBtn = document.getElementById("micBtn");
-    const speakerBtn = document.getElementById("speakerBtn");
     const autoSendCheckbox = document.getElementById("autoSendCheckbox");
     const timeoutSecondsInput = document.getElementById("timeoutSeconds");
     const messagesDiv = document.getElementById("messages");
 
     let recognition, autoSendTimer, collectedTranscript = "";
     let autoSendEnabled = true;
-    let autoSendDelay = 60000; // 60 seconds
-    let isSimulationActive = false;
+    let autoSendDelay = 5000;
 
     function appendMessage(who, text) {
       const msg = document.createElement("div");
       msg.className = who;
-      msg.innerHTML = DOMPurify.sanitize(who.toUpperCase() + ": " + text);
+      msg.textContent = who.toUpperCase() + ": " + text;
       messagesDiv.appendChild(msg);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
     function speak(text, callback) {
-      speakerBtn.classList.add("active");
-      speakerBtn.textContent = "Speaker: On";
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.onend = () => {
-        speakerBtn.classList.remove("active");
-        speakerBtn.textContent = "Speaker: Off";
-        if (callback && isSimulationActive) callback();
+        if (callback) callback();
       };
       speechSynthesis.speak(utterance);
     }
 
     function startRecognition() {
-      if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
-        appendMessage("ai", "Speech recognition not supported in this browser.");
-        return;
-      }
       collectedTranscript = "";
       recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
       recognition.lang = "en-US";
       recognition.interimResults = false;
-      recognition.continuous = true;
+      recognition.continuous = false;
 
       recognition.onresult = (event) => {
-        const transcript = event.results[event.results.length - 1][0].transcript;
+        const transcript = event.results[0][0].transcript;
         appendMessage("user", transcript);
-        sendBtn.disabled = false;
 
+        // Check for manual "send" keyword
         if (transcript.toLowerCase().includes("send")) {
           clearTimeout(autoSendTimer);
           processUserInput(transcript.replace(/send/i, "").trim());
@@ -106,136 +83,40 @@
       };
 
       recognition.onerror = (e) => {
-        let errorMessage = "";
-        switch (e.error) {
-          case "network":
-            errorMessage = "Network error: Please check your internet connection and try again.";
-            break;
-          case "no-speech":
-            errorMessage = "No speech detected. Please speak clearly and try again.";
-            break;
-          case "not-allowed":
-            errorMessage = "Microphone access denied. Please allow microphone access.";
-            break;
-          default:
-            errorMessage = `Speech recognition error: ${e.error}. Please try again.`;
-        }
-        appendMessage("ai", errorMessage);
-        if (isSimulationActive) {
-          setTimeout(() => {
-            appendMessage("ai", "Attempting to restart microphone...");
-            startRecognition();
-          }, 3000); // Retry after 3 seconds
-        }
+        console.error("Speech error:", e.error);
       };
 
       recognition.onend = () => {
-        if (isSimulationActive && recognition.isActive) {
-          try {
-            recognition.start();
-          } catch (e) {
-            appendMessage("ai", "Failed to restart microphone. Please click 'Start Simulation' again.");
-            stopRecognition();
-          }
-        }
+        console.log("Recognition ended.");
       };
 
-      try {
-        recognition.isActive = true;
-        isSimulationActive = true;
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
-        micBtn.disabled = false;
-        micBtn.classList.add("active");
-        micBtn.textContent = "Microphone: On";
-        sendBtn.disabled = true;
-        recognition.start();
-      } catch (e) {
-        appendMessage("ai", "Microphone access denied. Please allow microphone access.");
-        stopRecognition();
-      }
-    }
-
-    function stopRecognition() {
-      if (recognition) {
-        recognition.isActive = false;
-        isSimulationActive = false;
-        recognition.stop();
-        clearTimeout(autoSendTimer);
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
-        micBtn.disabled = true;
-        micBtn.classList.remove("active");
-        micBtn.textContent = "Microphone: Off";
-        sendBtn.disabled = true;
-      }
-    }
-
-    async function generateAIResponse(text) {
-      try {
-        const response = await fetch('/api/grok', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text })
-        });
-        const data = await response.json();
-        if (data.error) {
-          throw new Error(data.error);
-        }
-        return data.response;
-      } catch (error) {
-        console.error('AI API Error:', error);
-        return "Sorry, I couldn't process your request. Please try again.";
-      }
+      recognition.start();
     }
 
     function processUserInput(text) {
       if (!text) return;
       appendMessage("user", text);
       collectedTranscript = "";
-      sendBtn.disabled = true;
 
-      // Stop microphone during AI response
-      if (recognition) {
-        recognition.isActive = false;
-        recognition.stop();
-        micBtn.classList.remove("active");
-        micBtn.textContent = "Microphone: Off";
-      }
-
-      appendMessage("ai", "Thinking...");
-      generateAIResponse(text).then(response => {
-        const lastMessage = messagesDiv.lastChild;
-        if (lastMessage.textContent.startsWith("AI: Thinking...")) {
-          messagesDiv.removeChild(lastMessage);
-        }
-        speak(response, () => {
-          if (isSimulationActive) {
-            startRecognition(); // Restart microphone after AI speaks
-          }
-        });
-        appendMessage("ai", response);
+      // Simulate AI thinking
+      const response = generateFakeAIResponse(text);
+      speak(response, () => {
+        startRecognition(); // Auto-restart mic after speaking
       });
+      appendMessage("ai", response);
+    }
+
+    function generateFakeAIResponse(text) {
+      // Replace this with real API call
+      return "You said: " + text + ". That's interesting!";
     }
 
     startBtn.addEventListener("click", () => {
       startRecognition();
     });
 
-    stopBtn.addEventListener("click", () => {
-      stopRecognition();
-    });
-
-    sendBtn.addEventListener("click", () => {
-      clearTimeout(autoSendTimer);
-      processUserInput(collectedTranscript);
-    });
-
     autoSendCheckbox.addEventListener("change", (e) => {
       autoSendEnabled = e.target.checked;
-      if (!autoSendEnabled) {
-        clearTimeout(autoSendTimer);
-      }
     });
 
     timeoutSecondsInput.addEventListener("input", (e) => {
