@@ -31,7 +31,7 @@ const S4_SCORING_GRID = {
 function evaluateS4Response(text, stage, conversationHistory) {
   let comment = `*${stage}: `;
   let score = 0;
-  let scores = {};
+  let hasBE = false;
 
   const lowerText = text.toLowerCase();
 
@@ -40,20 +40,18 @@ function evaluateS4Response(text, stage, conversationHistory) {
     if (lowerText.match(/comcast/i) && lowerText.match(/this is/i) && lowerText.match(/name please|assist/i)) {
       comment += `Greeting ME (3), `;
       score += S4_SCORING_GRID.S1.Greeting.ME;
-      scores.Greeting = S4_SCORING_GRID.S1.Greeting.ME;
     } else {
       comment += `Greeting BE (0), `;
-      scores.Greeting = S4_SCORING_GRID.S1.Greeting.BE;
+      hasBE = true;
     }
 
     // Reflect
     if (conversationHistory.some(msg => msg.content.match(/bill doubled/i)) && lowerText.match(/sorry|inconvenience/i)) {
       comment += `Reflect ME (15), `;
       score += S4_SCORING_GRID.S1.Reflect.ME;
-      scores.Reflect = S4_SCORING_GRID.S1.Reflect.ME;
     } else if (conversationHistory.length > 0) {
       comment += `Reflect BE (0), `;
-      scores.Reflect = S4_SCORING_GRID.S1.Reflect.BE;
+      hasBE = true;
     }
 
     // Authenticate
@@ -61,25 +59,22 @@ function evaluateS4Response(text, stage, conversationHistory) {
       if (lowerText.match(/may i/i)) {
         comment += `Authenticate HE (4), `;
         score += S4_SCORING_GRID.S1.Authenticate.HE;
-        scores.Authenticate = S4_SCORING_GRID.S1.Authenticate.HE;
       } else {
         comment += `Authenticate ME (2), `;
         score += S4_SCORING_GRID.S1.Authenticate.ME;
-        scores.Authenticate = S4_SCORING_GRID.S1.Authenticate.ME;
       }
     } else {
       comment += `Authenticate BE (0), `;
-      scores.Authenticate = S4_SCORING_GRID.S1.Authenticate.BE;
+      hasBE = true;
     }
   } else if (stage === 'S2') {
     // Probe
     if (lowerText.match(/check|verify|describe/i)) {
       comment += `Probe ME (4), `;
       score += S4_SCORING_GRID.S2.Probe.ME;
-      scores.Probe = S4_SCORING_GRID.S2.Probe.ME;
     } else {
       comment += `Probe BE (0), `;
-      scores.Probe = S4_SCORING_GRID.S2.Probe.BE;
+      hasBE = true;
     }
 
     // Resolve
@@ -87,35 +82,31 @@ function evaluateS4Response(text, stage, conversationHistory) {
       if (lowerText.match(/reason/i)) {
         comment += `Resolve HE (14), `;
         score += S4_SCORING_GRID.S2.Resolve.HE;
-        scores.Resolve = S4_SCORING_GRID.S2.Resolve.HE;
       } else {
         comment += `Resolve ME (7), `;
         score += S4_SCORING_GRID.S2.Resolve.ME;
-        scores.Resolve = S4_SCORING_GRID.S2.Resolve.ME;
       }
     } else {
       comment += `Resolve BE (0), `;
-      scores.Resolve = S4_SCORING_GRID.S2.Resolve.BE;
+      hasBE = true;
     }
 
     // Build Value
     if (lowerText.match(/email|online|self-service/i)) {
       comment += `BuildValue ME (6), `;
       score += S4_SCORING_GRID.S2.BuildValue.ME;
-      scores.BuildValue = S4_SCORING_GRID.S2.BuildValue.ME;
     } else {
       comment += `BuildValue BE (0), `;
-      scores.BuildValue = S4_SCORING_GRID.S2.BuildValue.BE;
+      hasBE = true;
     }
   } else if (stage === 'S3') {
     // Transition
     if (lowerText.match(/offer|discount|best value/i)) {
       comment += `Transition ME (3), `;
       score += S4_SCORING_GRID.S3.Transition.ME;
-      scores.Transition = S4_SCORING_GRID.S3.Transition.ME;
     } else {
       comment += `Transition BE (0), `;
-      scores.Transition = S4_SCORING_GRID.S3.Transition.BE;
+      hasBE = true;
     }
 
     // Present
@@ -123,35 +114,31 @@ function evaluateS4Response(text, stage, conversationHistory) {
       if (lowerText.match(/50%/i)) {
         comment += `Present HE (6), `;
         score += S4_SCORING_GRID.S3.Present.HE;
-        scores.Present = S4_SCORING_GRID.S3.Present.HE;
       } else {
         comment += `Present ME (3), `;
         score += S4_SCORING_GRID.S3.Present.ME;
-        scores.Present = S4_SCORING_GRID.S3.Present.ME;
       }
     } else {
       comment += `Present BE (0), `;
-      scores.Present = S4_SCORING_GRID.S3.Present.BE;
+      hasBE = true;
     }
 
     // Close
     if (lowerText.match(/schedule|callback/i)) {
       comment += `Close ME (4), `;
       score += S4_SCORING_GRID.S3.Close.ME;
-      scores.Close = S4_SCORING_GRID.S3.Close.ME;
     } else {
       comment += `Close BE (0), `;
-      scores.Close = S4_SCORING_GRID.S3.Close.BE;
+      hasBE = true;
     }
   } else if (stage === 'S4') {
     // Summarize
     if (lowerText.match(/recap|corrected|next steps/i)) {
       comment += `Summarize ME (7), `;
       score += S4_SCORING_GRID.S4.Summarize.ME;
-      scores.Summarize = S4_SCORING_GRID.S4.Summarize.ME;
     } else {
       comment += `Summarize BE (0), `;
-      scores.Summarize = S4_SCORING_GRID.S4.Summarize.BE;
+      hasBE = true;
     }
 
     // Close Contact
@@ -159,42 +146,38 @@ function evaluateS4Response(text, stage, conversationHistory) {
       if (lowerText.match(/pleasure|lovely/i)) {
         comment += `CloseContact HE (4), `;
         score += S4_SCORING_GRID.S4.CloseContact.HE;
-        scores.CloseContact = S4_SCORING_GRID.S4.CloseContact.HE;
       } else {
         comment += `CloseContact ME (4), `;
         score += S4_SCORING_GRID.S4.CloseContact.ME;
-        scores.CloseContact = S4_SCORING_GRID.S4.CloseContact.ME;
       }
     } else {
       comment += `CloseContact BE (0), `;
-      scores.CloseContact = S4_SCORING_GRID.S4.CloseContact.BE;
+      hasBE = true;
     }
 
     // Documentation
     comment += `Documentation ME (3), `;
     score += S4_SCORING_GRID.S4.Documentation.ME;
-    scores.Documentation = S4_SCORING_GRID.S4.Documentation.ME;
   }
 
   // Behaviors
   if (lowerText.match(/sorry|please|thank you/i)) {
     comment += `Tone ME (3), Rapport ME (4), `;
     score += S4_SCORING_GRID.Behaviors.Tone.ME + S4_SCORING_GRID.Behaviors.Rapport.ME;
-    scores.Tone = S4_SCORING_GRID.Behaviors.Tone.ME;
-    scores.Rapport = S4_SCORING_GRID.Behaviors.Rapport.ME;
   } else {
     comment += `Tone BE (0), Rapport BE (0), `;
-    scores.Tone = S4_SCORING_GRID.Behaviors.Tone.BE;
-    scores.Rapport = S4_SCORING_GRID.Behaviors.Rapport.BE;
+    hasBE = true;
   }
   comment += `Listening ME (3), Contact ME (3), Responsibility ME (4), `;
   score += S4_SCORING_GRID.Behaviors.Listening.ME + S4_SCORING_GRID.Behaviors.Contact.ME + S4_SCORING_GRID.Behaviors.Responsibility.ME;
-  scores.Listening = S4_SCORING_GRID.Behaviors.Listening.ME;
-  scores.Contact = S4_SCORING_GRID.Behaviors.Contact.ME;
-  scores.Responsibility = S4_SCORING_GRID.Behaviors.Responsibility.ME;
 
-  comment += `Score: ${score}*`;
-  return { comment, score, scores };
+  comment += `Score: ${score}`;
+  if (hasBE) {
+    comment += `. Say: "${stage === 'S1' ? 'Thank you for calling Comcast, I’m Leo. How may I help?' : stage === 'S2' ? 'I’m checking your bill now.' : stage === 'S3' ? 'I recommend our mobile service.' : 'Is there anything else I can help with?'}”`;
+  }
+  comment += `*`;
+
+  return { comment, score };
 }
 
 export { S4_SCORING_GRID, evaluateS4Response };
