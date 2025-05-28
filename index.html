@@ -173,6 +173,7 @@
       };
 
       rec.onend = () => {
+        // Only update UI if manually stopped
         if (!isRecognizing) {
           startBtn.textContent = '🎤 Start Listening';
           micBtn.classList.remove('active');
@@ -227,15 +228,15 @@
         const data = await res.json();
         const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '(No response)';
         aiResponseEl.textContent = reply;
-        isRecognizing = true; // Re-enable recognition for automatic restart
         speak(reply, () => {
-          if (isRecognizing) startRec(); // Automatically restart microphone
+          startRec(); // Automatically start microphone after TTS
         });
       } catch (e) {
         aiResponseEl.textContent = 'AI Error: ' + e.message;
         console.error('Fetch failed:', e);
-        isRecognizing = true; // Allow restart even on error
-        startRec(); // Restart microphone on error
+        speak('Error: Unable to get AI response.', () => {
+          startRec(); // Start microphone after error message
+        });
       } finally {
         loader.style.display = 'none';
         speakerBtn.classList.remove('active');
@@ -245,10 +246,17 @@
     }
 
     function speak(text, callback) {
-      if (!window.speechSynthesis) return;
+      if (!window.speechSynthesis) {
+        console.log('Speech synthesis not supported.');
+        if (callback) callback(); // Proceed to callback if no TTS
+        return;
+      }
       const utter = new SpeechSynthesisUtterance(text);
       utter.lang = 'en-US';
-      utter.onend = callback;
+      utter.onend = () => {
+        console.log('TTS finished');
+        if (callback) callback();
+      };
       window.speechSynthesis.speak(utter);
     }
 
