@@ -1,115 +1,67 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Comcast Call Simulator</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Speech to Text Demo</title>
   <style>
-    body { font-family: sans-serif; margin: 20px; }
-    button { padding: 10px 15px; margin: 5px; }
-    #mic-status { color: red; font-weight: bold; display: none; }
-    #chat { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto; margin-bottom: 10px; }
-    .agent { color: blue; }
-    .customer { color: green; }
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 2rem;
+    }
+    #mic {
+      font-size: 2rem;
+      background: red;
+      color: white;
+      border: none;
+      padding: 1rem;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    #output {
+      margin-top: 2rem;
+      font-size: 1.2rem;
+      min-height: 2rem;
+      color: #333;
+    }
   </style>
 </head>
 <body>
-  <h2>Comcast Call Simulation</h2>
-  <div id="chat"></div>
-
-  <div>
-    <button onclick="startSimulation()">Start Simulation</button>
-    <button id="micBtn" onclick="startMic()" disabled>🎤 Talk</button>
-    <span id="mic-status">Mic ON</span>
-  </div>
-
-  <input type="text" id="manualInput" placeholder="Type message..." style="width: 70%;">
-  <button onclick="sendMessage()">Send</button>
+  <h1>🎤 Speak Something!</h1>
+  <button id="mic">🎙️</button>
+  <div id="output">(waiting for input...)</div>
 
   <script>
-    const inquiries = [
-      "My TV service keeps freezing.",
-      "I was overcharged on my last bill.",
-      "My internet is down since yesterday.",
-      "I need to return my modem.",
-      "Can I upgrade my plan?"
-    ];
-    let chat = document.getElementById('chat');
-    let micStatus = document.getElementById('mic-status');
-    let micBtn = document.getElementById('micBtn');
-    let currentStep = 'agent';
+    const micButton = document.getElementById('mic');
+    const output = document.getElementById('output');
 
-    function addMessage(role, msg) {
-      const div = document.createElement('div');
-      div.className = role;
-      div.textContent = `${role === 'agent' ? 'Agent' : 'Customer'}: ${msg}`;
-      chat.appendChild(div);
-      chat.scrollTop = chat.scrollHeight;
-    }
-
-    function startSimulation() {
-      chat.innerHTML = '';
-      const inquiry = inquiries[Math.floor(Math.random() * inquiries.length)];
-      addMessage('customer', inquiry);
-      currentStep = 'agent';
-      micBtn.disabled = false;
-    }
-
-    function startMic() {
-      micStatus.style.display = 'inline';
-      let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    let recognition;
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
       recognition.lang = 'en-US';
-      recognition.start();
 
-      recognition.onresult = (e) => {
-        let transcript = e.results[0][0].transcript;
-        recognition.stop();
-        micStatus.style.display = 'none';
-
-        if (transcript.toLowerCase().includes('send')) {
-          sendMessage('');
-        } else {
-          document.getElementById('manualInput').value = transcript;
-        }
+      recognition.onresult = function (event) {
+        const transcript = event.results[0][0].transcript;
+        output.textContent = "You said: " + transcript;
       };
 
-      recognition.onerror = () => {
-        micStatus.style.display = 'none';
+      recognition.onerror = function (event) {
+        output.textContent = "Error: " + event.error;
       };
+    } else {
+      output.textContent = "Speech recognition not supported in this browser.";
+      micButton.disabled = true;
     }
 
-    async function sendMessage(msg = '') {
-      const input = document.getElementById('manualInput');
-      const text = msg || input.value;
-      if (!text.trim()) return;
-
-      addMessage('agent', text);
-      input.value = '';
-      micBtn.disabled = true;
-
-      // Simulate customer reply via AI
-      const reply = await getAIResponse(text);
-      addMessage('customer', reply);
-      micBtn.disabled = false;
-    }
-
-    async function getAIResponse(text) {
-      const res = await fetch('https://your-cloudflare-endpoint.com', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text }] }] })
-      });
-      const data = await res.json();
-      return data?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, can you repeat that?";
-    }
-
-    // Idle timer
-    let idleTimer;
-    document.onmousemove = document.onkeypress = () => {
-      clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => {
-        alert("Call idle. Starting new scenario...");
-        startSimulation();
-      }, 60000);
+    micButton.onclick = () => {
+      if (recognition) {
+        recognition.start();
+        output.textContent = "Listening...";
+      }
     };
   </script>
 </body>
