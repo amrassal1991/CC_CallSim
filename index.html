@@ -49,19 +49,38 @@
 
     #start-btn { background-color: #4CAF50; color: white; }
     #send-btn { background-color: #2196F3; color: white; }
+    #mic-btn.active { background-color: #ff3333; color: white; }
+    #speaker-btn.active { background-color: #ff3333; color: white; }
+    #send-btn:disabled, #mic-btn:disabled, #speaker-btn:disabled { background-color: #cccccc; }
 
     #loader {
       display: none;
       margin: 10px;
       font-style: italic;
     }
+
+    #settings {
+      margin: 15px 0;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Call Simulator 🎧</h1>
+    <div id="settings">
+      <label>
+        <input type="checkbox" id="autoSendCheckbox" checked>
+        Enable Auto-Send on Silence
+      </label><br>
+      <label>
+        Silence Timeout (seconds):
+        <input type="number" id="timeoutSeconds" value="60" min="2" max="120">
+      </label>
+    </div>
     <button id="start-btn">🎤 Start Listening</button>
     <button id="send-btn" disabled>✉️ Send</button>
+    <button id="mic-btn" disabled>Microphone: Off</button>
+    <button id="speaker-btn" disabled>Speaker: Off</button>
     <div id="loader">⏳ AI is thinking...</div>
 
     <h3>You Said:</h3>
@@ -76,11 +95,18 @@
 
     const startBtn = document.getElementById('start-btn');
     const sendBtn = document.getElementById('send-btn');
+    const micBtn = document.getElementById('mic-btn');
+    const speakerBtn = document.getElementById('speaker-btn');
     const loader = document.getElementById('loader');
     const transcriptEl = document.getElementById('transcript');
     const aiResponseEl = document.getElementById('ai-response');
+    const autoSendCheckbox = document.getElementById('autoSendCheckbox');
+    const timeoutSecondsInput = document.getElementById('timeoutSeconds');
 
     let recognition, finalTranscript = '', isRecognizing = false;
+    let autoSendEnabled = true;
+    let autoSendDelay = 60000; // 60 seconds
+    let autoSendTimer;
 
     function initRecognition() {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -97,28 +123,64 @@
         isRecognizing = true;
         startBtn.textContent = '🛑 Stop';
         transcriptEl.textContent = 'Listening...';
+        micBtn.disabled = false;
+        micBtn.classList.add('active');
+        micBtn.textContent = 'Microphone: On';
       };
 
       rec.onresult = e => {
         let interim = '';
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const t = e.results[i][0].transcript;
-          if (e.results[i].isFinal) finalTranscript += t + ' ';
-          else interim += t;
+          if (e.results[i].isFinal) {
+            finalTranscript = t;
+            if (t.toLowerCase().includes('send')) {
+              clearTimeout(autoSendTimer);
+              sendMessage(finalTranscript.replace(/send/i, '').trim());
+              return;
+            }
+          } else {
+            interim = t;
+          }
         }
         transcriptEl.textContent = finalTranscript + interim;
         sendBtn.disabled = !finalTranscript.trim();
+
+        if (autoSendEnabled && finalTranscript.trim()) {
+          clearTimeout(autoSendTimer);
+          autoSendTimer = setTimeout(() => {
+            sendMessage(finalTranscript.trim());
+          }, autoSendDelay);
+        }
       };
 
       rec.onerror = e => {
+        let errorMessage = '';
+        switch (e.error) {
+          case 'network':
+            errorMessage = 'Network error in speech recognition. Retrying in 3 seconds...';
+            break;
+          default:
+            errorMessage = `Speech error: ${e.error}`;
+        }
+        transcriptEl.textContent = errorMessage;
         console.error('Speech error:', e.error);
-        transcriptEl.textContent = 'Error: ' + e.error;
-        stopRec();
+        if (isRecognizing) {
+          setTimeout(() => {
+            if (isRecognizing) startRec();
+          }, 3000);
+        }
       };
 
       rec.onend = () => {
-        isRecognizing = false;
-        startBtn.textContent = '🎤 Start Listening';
+        if (isRecognizing) {
+          try {
+            rec.start();
+          } catch (e) {
+            transcriptEl.textContent = 'Failed to restart microphone. Please click Start Listening.';
+            stopRec();
+          }
+        }
       };
 
       return rec;
@@ -129,25 +191,38 @@
       finalTranscript = '';
       transcriptEl.textContent = '';
       sendBtn.disabled = true;
-      recognition.start();
+      try {
+        recognition.start();
+      } catch (e) {
+        transcriptEl.textContent = 'Microphone access denied. Please allow access.';
+        stopRec();
+      }
     }
 
     function stopRec() {
-      if (recognition && isRecognizing) recognition.stop();
+      if (recognition && isRecognizing) {
+        recognition.stop();
+        isRecognizing = false;
+        startBtn.textContent = '🎤 Start Listening';
+        micBtn.classList.remove('active');
+        micBtn.textContent = 'Microphone: Off';
+        micBtn.disabled = true;
+        sendBtn.disabled = true;
+        clearTimeout(autoSendTimer);
+      }
     }
 
-    startBtn.addEventListener('click', () => {
-      isRecognizing ? stopRec() : startRec();
-    });
-
-    sendBtn.addEventListener('click', async () => {
+    async function sendMessage(text) {
+      if (!text) return;
       stopRec();
       sendBtn.disabled = true;
       loader.style.display = 'block';
       aiResponseEl.textContent = '';
+      speakerBtn.classList.add('active');
+      speakerBtn.textContent = 'Speaker: On';
 
       try {
-        const payload = { contents: [{ parts: [{ text: finalTranscript.trim() }] }] };
+        const payload = { contents: [{ parts: [{ text }] }] };
         const res = await fetch(WORKER_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -157,21 +232,47 @@
         const data = await res.json();
         const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '(No response)';
         aiResponseEl.textContent = reply;
-        speak(reply);
+        speak(reply, () => {
+          if (isRecognizing) startRec(); // Reactivate microphone after AI speaks
+        });
       } catch (e) {
         aiResponseEl.textContent = 'AI Error: ' + e.message;
         console.error('Fetch failed:', e);
+        if (isRecognizing) startRec(); // Reactivate microphone even on error
       } finally {
         loader.style.display = 'none';
+        speakerBtn.classList.remove('active');
+        speakerBtn.textContent = 'Speaker: Off';
       }
-    });
+    }
 
-    function speak(text) {
+    function speak(text, callback) {
       if (!window.speechSynthesis) return;
       const utter = new SpeechSynthesisUtterance(text);
       utter.lang = 'en-US';
+      utter.onend = callback;
       window.speechSynthesis.speak(utter);
     }
+
+    startBtn.addEventListener('click', () => {
+      isRecognizing ? stopRec() : startRec();
+    });
+
+    sendBtn.addEventListener('click', () => {
+      clearTimeout(autoSendTimer);
+      sendMessage(finalTranscript.trim());
+    });
+
+    autoSendCheckbox.addEventListener('change', (e) => {
+      autoSendEnabled = e.target.checked;
+      if (!autoSendEnabled) {
+        clearTimeout(autoSendTimer);
+      }
+    });
+
+    timeoutSecondsInput.addEventListener('input', (e) => {
+      autoSendDelay = parseInt(e.target.value) * 1000;
+    });
   </script>
 </body>
 </html>
