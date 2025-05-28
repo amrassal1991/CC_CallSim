@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Call Simulator</title>
+  <title>Comcast S4 Call Simulator</title>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
@@ -19,7 +19,7 @@
     }
 
     .container {
-      max-width: 700px;
+      max-width: 800px;
       margin: 0 auto;
       background: #fff;
       border-radius: 12px;
@@ -27,7 +27,7 @@
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
     }
 
-    #transcript, #ai-response {
+    #transcript, #ai-response, #evaluation {
       border: 1px solid #ddd;
       padding: 15px;
       margin: 15px 0;
@@ -66,7 +66,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Call Simulator 🎧</h1>
+    <h1>Comcast S4 Call Simulator 🎧</h1>
     <div id="settings">
       <label>
         <input type="checkbox" id="autoSendCheckbox" checked>
@@ -88,6 +88,9 @@
 
     <h3>Customer (AI) Said:</h3>
     <div id="ai-response">—</div>
+
+    <h3>S4 Evaluation:</h3>
+    <div id="evaluation">—</div>
   </div>
 
   <script>
@@ -100,6 +103,7 @@
     const loader = document.getElementById('loader');
     const transcriptEl = document.getElementById('transcript');
     const aiResponseEl = document.getElementById('ai-response');
+    const evaluationEl = document.getElementById('evaluation');
     const autoSendCheckbox = document.getElementById('autoSendCheckbox');
     const timeoutSecondsInput = document.getElementById('timeoutSeconds');
 
@@ -107,6 +111,15 @@
     let autoSendEnabled = true;
     let autoSendDelay = 60000; // 60 seconds
     let autoSendTimer;
+    let callStage = 'S1'; // Tracks S4 stage: S1 (Start), S2 (Solve), S3 (Sell), S4 (Summarize)
+    let conversationHistory = [];
+    let s4Scores = {
+      S1: { Greeting: 0, Reflect: 0, Authenticate: 0 },
+      S2: { Probe: 0, Resolve: 0, BuildValue: 0 },
+      S3: { Transition: 0, Present: 0, Objections: 0, Close: 0 },
+      S4: { Summarize: 0, CloseContact: 0, Documentation: 0 },
+      Behaviors: { Tone: 0, Listening: 0, Contact: 0, Responsibility: 0, Rapport: 0 }
+    };
 
     function initRecognition() {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -173,7 +186,6 @@
       };
 
       rec.onend = () => {
-        // Only update UI if manually stopped
         if (!isRecognizing) {
           startBtn.textContent = '🎤 Start Listening';
           micBtn.classList.remove('active');
@@ -209,16 +221,27 @@
 
     async function sendMessage(text) {
       if (!text) return;
-      stopRec(); // Stop microphone during AI response
+      stopRec();
       sendBtn.disabled = true;
       loader.style.display = 'block';
       aiResponseEl.textContent = '';
+      evaluationEl.textContent = '';
       speakerBtn.disabled = false;
       speakerBtn.classList.add('active');
       speakerBtn.textContent = 'Speaker: On';
 
       try {
-        const payload = { contents: [{ parts: [{ text }] }] };
+        // Evaluate agent's response against S4 criteria
+        const evaluation = evaluateS4Response(text, callStage);
+        evaluationEl.innerHTML = evaluation.comment + '<br><b>Score:</b> ' + evaluation.score + ' points';
+        s4Scores[callStage] = { ...s4Scores[callStage], ...evaluation.scores };
+
+        // Update conversation history
+        conversationHistory.push({ role: 'agent', content: text });
+
+        // Generate customer response
+        const prompt = `You are a Comcast postpaid small to medium business customer with TV, landline, or Internet service. You have a concern about billing (e.g., overcharge) or technical support (e.g., Internet outage). Respond realistically to the agent's input: "${text}". Keep the conversation natural, reflecting customer emotions (e.g., frustration, confusion). If the agent's response addresses your concern, acknowledge it and move to next steps or a new concern. If not, express dissatisfaction or ask follow-up questions. Current call stage: ${callStage}. Conversation history: ${JSON.stringify(conversationHistory)}. Start with a greeting if this is the first response.`;
+        const payload = { contents: [{ parts: [{ text: prompt }] }] };
         const res = await fetch(WORKER_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -228,6 +251,11 @@
         const data = await res.json();
         const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '(No response)';
         aiResponseEl.textContent = reply;
+        conversationHistory.push({ role: 'customer', content: reply });
+
+        // Update call stage based on agent response
+        updateCallStage(text);
+
         speak(reply, () => {
           startRec(); // Automatically start microphone after TTS
         });
@@ -235,7 +263,7 @@
         aiResponseEl.textContent = 'AI Error: ' + e.message;
         console.error('Fetch failed:', e);
         speak('Error: Unable to get AI response.', () => {
-          startRec(); // Start microphone after error message
+          startRec();
         });
       } finally {
         loader.style.display = 'none';
@@ -248,7 +276,7 @@
     function speak(text, callback) {
       if (!window.speechSynthesis) {
         console.log('Speech synthesis not supported.');
-        if (callback) callback(); // Proceed to callback if no TTS
+        if (callback) callback();
         return;
       }
       const utter = new SpeechSynthesisUtterance(text);
@@ -258,6 +286,144 @@
         if (callback) callback();
       };
       window.speechSynthesis.speak(utter);
+    }
+
+    function evaluateS4Response(text, stage) {
+      let comment = '';
+      let score = 0;
+      let scores = {};
+
+      if (stage === 'S1') {
+        // S1: Greeting
+        if (text.match(/comcast/i) && text.match(/my name is/i) && text.match(/(how may|can) i (help|assist)/i)) {
+          comment += 'Greeting: Meets Expectations. Includes Comcast name, agent name, and offer of assistance.<br>';
+          score += 3;
+          scores.Greeting = 3;
+        } else {
+          comment += 'Greeting: Below Expectations. Missing Comcast name, agent name, or offer of assistance. Recommended: "Thank you for choosing Comcast, my name is Maria. How may I help you today?"<br>';
+          scores.Greeting = 0;
+        }
+
+        // S1: Reflect, Relate, Empathize
+        if (conversationHistory.length > 0 && text.match(/(sorry|understand|frustrating)/i)) {
+          comment += 'Reflect/Empathize: Meets Expectations. Acknowledges customer’s concern.<br>';
+          score += 15;
+          scores.Reflect = 15;
+        } else {
+          comment += 'Reflect/Empathize: Below Expectations. Fails to acknowledge customer’s concern. Recommended: "I’m sorry you’re experiencing this issue. That can be frustrating."<br>';
+          scores.Reflect = 0;
+        }
+
+        // S1: Authenticate/Set Agenda
+        if (text.match(/(verify|authenticate|who am i speaking with)/i)) {
+          comment += 'Authenticate: Meets Expectations. Attempts to verify caller.<br>';
+          score += 2;
+          scores.Authenticate = 2;
+        } else {
+          comment += 'Authenticate: Below Expectations. No verification attempt. Recommended: "For security purposes, may I ask who I’m speaking with?"<br>';
+          scores.Authenticate = 0;
+        }
+      } else if (stage === 'S2') {
+        // S2: Probe
+        if (text.match(/(what|how|when|can you describe)/i)) {
+          comment += 'Probe: Meets Expectations. Asks clarifying questions.<br>';
+          score += 4;
+          scores.Probe = 4;
+        } else {
+          comment += 'Probe: Below Expectations. No clarifying questions. Recommended: "Can you describe the issue you’re experiencing?"<br>';
+          scores.Probe = 0;
+        }
+
+        // S2: Resolve
+        if (text.match(/(fixed|resolved|will take care of)/i)) {
+          comment += 'Resolve: Meets Expectations. Addresses customer’s issue.<br>';
+          score += 7;
+          scores.Resolve = 7;
+        } else {
+          comment += 'Resolve: Below Expectations. Fails to address issue. Recommended: "I’ll take care of this by resetting your modem."<br>';
+          scores.Resolve = 0;
+        }
+
+        // S2: Build Value
+        if (text.match(/(email|self-service|features)/i)) {
+          comment += 'Build Value: Meets Expectations. Mentions existing service value.<br>';
+          score += 6;
+          scores.BuildValue = 6;
+        } else {
+          comment += 'Build Value: Below Expectations. No value mentioned. Recommended: "Can I confirm your email to send service updates?"<br>';
+          scores.BuildValue = 0;
+        }
+      } else if (stage === 'S3') {
+        // S3: Transition
+        if (text.match(/(review your account|best value)/i)) {
+          comment += 'Transition: Meets Expectations. Bridges to sales.<br>';
+          score += 3;
+          scores.Transition = 3;
+        } else {
+          comment += 'Transition: Below Expectations. No sales bridge. Recommended: "Now that we’ve fixed your issue, I’d like to ensure you’re getting the best value."<br>';
+          scores.Transition = 0;
+        }
+
+        // S3: Present Offer
+        if (text.match(/(recommend|upgrade|benefits)/i)) {
+          comment += 'Present Offer: Meets Expectations. Shares benefits.<br>';
+          score += 3;
+          scores.Present = 3;
+        } else {
+          comment += 'Present Offer: Below Expectations. No benefits shared. Recommended: "I recommend our high-speed Internet for your business needs."<br>';
+          scores.Present = 0;
+        }
+      } else if (stage === 'S4') {
+        // S4: Summarize
+        if (text.match(/(recap|next steps|we have done)/i)) {
+          comment += 'Summarize: Meets Expectations. Recaps actions.<br>';
+          score += 7;
+          scores.Summarize = 7;
+        } else {
+          comment += 'Summarize: Below Expectations. No recap. Recommended: "Let’s review: we’ve resolved your billing issue and updated your account."<br>';
+          scores.Summarize = 0;
+        }
+
+        // S4: Close Contact
+        if (text.match(/(anything else|thank you)/i)) {
+          comment += 'Close Contact: Meets Expectations. Offers further assistance.<br>';
+          score += 4;
+          scores.CloseContact = 4;
+        } else {
+          comment += 'Close Contact: Below Expectations. No offer of assistance. Recommended: "Is there anything else I can help with today?"<br>';
+          scores.CloseContact = 0;
+        }
+
+        // S4: Documentation (assumed based on intent)
+        scores.Documentation = 0; // Not evaluated from speech
+      }
+
+      // Behaviors (apply across stages)
+      if (text.match(/(sorry|please|thank you)/i)) {
+        comment += 'Behaviors: Meets Expectations for Tone and Rapport. Polite and professional.<br>';
+        score += 7;
+        scores.Tone = 3;
+        scores.Rapport = 4;
+      } else {
+        comment += 'Behaviors: Below Expectations for Tone and Rapport. Lacks politeness. Recommended: Use phrases like "Thank you for calling Comcast."<br>';
+        scores.Tone = 0;
+        scores.Rapport = 0;
+      }
+      scores.Listening = 3; // Assumed unless interruption detected
+      scores.Contact = 3; // Assumed unless long pauses detected
+      scores.Responsibility = 4; // Assumed unless blame detected
+
+      return { comment, score, scores };
+    }
+
+    function updateCallStage(text) {
+      if (callStage === 'S1' && text.match(/(fixed|resolved|will take care of)/i)) {
+        callStage = 'S2';
+      } else if (callStage === 'S2' && text.match(/(review your account|best value)/i)) {
+        callStage = 'S3';
+      } else if (callStage === 'S3' && text.match(/(recap|next steps)/i)) {
+        callStage = 'S4';
+      }
     }
 
     startBtn.addEventListener('click', () => {
