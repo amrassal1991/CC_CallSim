@@ -2,115 +2,64 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Comcast Call Simulator</title>
+  <title>AI Call Simulator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
   <style>
-    body { font-family: sans-serif; margin: 20px; }
-    button { padding: 10px 15px; margin: 5px; }
-    #mic-status { color: red; font-weight: bold; display: none; }
-    #chat { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto; margin-bottom: 10px; }
-    .agent { color: blue; }
-    .customer { color: green; }
+    body { font-family: sans-serif; padding: 2em; }
+    #messages { border: 1px solid #ccc; padding: 1em; height: 200px; overflow-y: auto; margin-bottom: 1em; }
+    #settings { margin-bottom: 1em; }
+    .ai { color: blue; }
+    .user { color: green; }
+    button { margin-right: 1em; padding: 0.5em 1em; }
+    #micBtn.active { background-color: #ff3333; color: white; }
+    #speakerBtn.active { background-color: #ff3333; color: white; }
+    #sendBtn { background-color: #4CAF50; color: white; }
+    #sendBtn:disabled, #startBtn:disabled, #stopBtn:disabled { background-color: #cccccc; }
   </style>
 </head>
 <body>
-  <h2>Comcast Call Simulation</h2>
-  <div id="chat"></div>
-
-  <div>
-    <button onclick="startSimulation()">Start Simulation</button>
-    <button id="micBtn" onclick="startMic()" disabled>🎤 Talk</button>
-    <span id="mic-status">Mic ON</span>
+  <h1>🧠 AI Call Simulator</h1>
+  
+  <div id="settings">
+    <label>
+      <input type="checkbox" id="autoSendCheckbox" checked>
+      Enable Auto-Send on Silence
+    </label><br>
+    <label>
+      Silence Timeout (seconds):
+      <input type="number" id="timeoutSeconds" value="60" min="2" max="120">
+    </label>
   </div>
 
-  <input type="text" id="manualInput" placeholder="Type message..." style="width: 70%;">
-  <button onclick="sendMessage()">Send</button>
+  <div id="messages"></div>
+  <button id="startBtn">Start Simulation</button>
+  <button id="stopBtn" disabled>Stop Simulation</button>
+  <button id="sendBtn" disabled>Send</button>
+  <button id="micBtn" disabled>Microphone: Off</button>
+  <button id="speakerBtn" disabled>Speaker: Off</button>
 
   <script>
-    const inquiries = [
-      "My TV service keeps freezing.",
-      "I was overcharged on my last bill.",
-      "My internet is down since yesterday.",
-      "I need to return my modem.",
-      "Can I upgrade my plan?"
-    ];
-    let chat = document.getElementById('chat');
-    let micStatus = document.getElementById('mic-status');
-    let micBtn = document.getElementById('micBtn');
-    let currentStep = 'agent';
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const sendBtn = document.getElementById("sendBtn");
+    const micBtn = document.getElementById("micBtn");
+    const speakerBtn = document.getElementById("speakerBtn");
+    const autoSendCheckbox = document.getElementById("autoSendCheckbox");
+    const timeoutSecondsInput = document.getElementById("timeoutSeconds");
+    const messagesDiv = document.getElementById("messages");
 
-    function addMessage(role, msg) {
-      const div = document.createElement('div');
-      div.className = role;
-      div.textContent = `${role === 'agent' ? 'Agent' : 'Customer'}: ${msg}`;
-      chat.appendChild(div);
-      chat.scrollTop = chat.scrollHeight;
+    let recognition, autoSendTimer, collectedTranscript = "";
+    let autoSendEnabled = true;
+    let autoSendDelay = 60000; // 60 seconds
+    let isSimulationActive = false;
+
+    function appendMessage(who, text) {
+      const msg = document.createElement("div");
+      msg.className = who;
+      msg.innerHTML = DOMPurify.sanitize(who.toUpperCase() + ": " + text);
+      messagesDiv.appendChild(msg);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
-    function startSimulation() {
-      chat.innerHTML = '';
-      const inquiry = inquiries[Math.floor(Math.random() * inquiries.length)];
-      addMessage('customer', inquiry);
-      currentStep = 'agent';
-      micBtn.disabled = false;
-    }
-
-    function startMic() {
-      micStatus.style.display = 'inline';
-      let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-      recognition.lang = 'en-US';
-      recognition.start();
-
-      recognition.onresult = (e) => {
-        let transcript = e.results[0][0].transcript;
-        recognition.stop();
-        micStatus.style.display = 'none';
-
-        if (transcript.toLowerCase().includes('send')) {
-          sendMessage('');
-        } else {
-          document.getElementById('manualInput').value = transcript;
-        }
-      };
-
-      recognition.onerror = () => {
-        micStatus.style.display = 'none';
-      };
-    }
-
-    async function sendMessage(msg = '') {
-      const input = document.getElementById('manualInput');
-      const text = msg || input.value;
-      if (!text.trim()) return;
-
-      addMessage('agent', text);
-      input.value = '';
-      micBtn.disabled = true;
-
-      // Simulate customer reply via AI
-      const reply = await getAIResponse(text);
-      addMessage('customer', reply);
-      micBtn.disabled = false;
-    }
-
-    async function getAIResponse(text) {
-      const res = await fetch('https://your-cloudflare-endpoint.com', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text }] }] })
-      });
-      const data = await res.json();
-      return data?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, can you repeat that?";
-    }
-
-    // Idle timer
-    let idleTimer;
-    document.onmousemove = document.onkeypress = () => {
-      clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => {
-        alert("Call idle. Starting new scenario...");
-        startSimulation();
-      }, 60000);
-    };
-  </script>
-</body>
-</html>
+    function speak(text, callback) {
+      speakerBtn.classList.add("active");
