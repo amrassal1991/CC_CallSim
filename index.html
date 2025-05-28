@@ -173,13 +173,12 @@
       };
 
       rec.onend = () => {
-        if (isRecognizing) {
-          try {
-            rec.start();
-          } catch (e) {
-            transcriptEl.textContent = 'Failed to restart microphone. Please click Start Listening.';
-            stopRec();
-          }
+        if (!isRecognizing) {
+          startBtn.textContent = '🎤 Start Listening';
+          micBtn.classList.remove('active');
+          micBtn.textContent = 'Microphone: Off';
+          micBtn.disabled = true;
+          sendBtn.disabled = true;
         }
       };
 
@@ -203,21 +202,17 @@
       if (recognition && isRecognizing) {
         recognition.stop();
         isRecognizing = false;
-        startBtn.textContent = '🎤 Start Listening';
-        micBtn.classList.remove('active');
-        micBtn.textContent = 'Microphone: Off';
-        micBtn.disabled = true;
-        sendBtn.disabled = true;
         clearTimeout(autoSendTimer);
       }
     }
 
     async function sendMessage(text) {
       if (!text) return;
-      stopRec();
+      stopRec(); // Stop microphone during AI response
       sendBtn.disabled = true;
       loader.style.display = 'block';
       aiResponseEl.textContent = '';
+      speakerBtn.disabled = false;
       speakerBtn.classList.add('active');
       speakerBtn.textContent = 'Speaker: On';
 
@@ -232,17 +227,20 @@
         const data = await res.json();
         const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '(No response)';
         aiResponseEl.textContent = reply;
+        isRecognizing = true; // Re-enable recognition for automatic restart
         speak(reply, () => {
-          if (isRecognizing) startRec(); // Reactivate microphone after AI speaks
+          if (isRecognizing) startRec(); // Automatically restart microphone
         });
       } catch (e) {
         aiResponseEl.textContent = 'AI Error: ' + e.message;
         console.error('Fetch failed:', e);
-        if (isRecognizing) startRec(); // Reactivate microphone even on error
+        isRecognizing = true; // Allow restart even on error
+        startRec(); // Restart microphone on error
       } finally {
         loader.style.display = 'none';
         speakerBtn.classList.remove('active');
         speakerBtn.textContent = 'Speaker: Off';
+        speakerBtn.disabled = true;
       }
     }
 
