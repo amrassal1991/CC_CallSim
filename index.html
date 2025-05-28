@@ -1,68 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Speech to Text Demo</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      padding: 2rem;
-    }
-    #mic {
-      font-size: 2rem;
-      background: red;
-      color: white;
-      border: none;
-      padding: 1rem;
-      border-radius: 50%;
-      cursor: pointer;
-    }
-    #output {
-      margin-top: 2rem;
-      font-size: 1.2rem;
-      min-height: 2rem;
-      color: #333;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Speech PWA</title>
+<link rel="manifest" href="manifest.json" />
+<style>
+  body { font-family: Arial, sans-serif; padding: 1em; }
+  button { font-size: 1.2em; padding: 0.5em 1em; }
+  #result { margin-top: 1em; white-space: pre-wrap; }
+</style>
 </head>
 <body>
-  <h1>🎤 Speak Something!</h1>
-  <button id="mic">🎙️</button>
-  <div id="output">(waiting for input...)</div>
+<h1>Speak & Ask AI</h1>
+<button id="startBtn">🎤 Start Speaking</button>
+<div id="result"></div>
 
-  <script>
-    const micButton = document.getElementById('mic');
-    const output = document.getElementById('output');
+<script>
+const startBtn = document.getElementById('startBtn')
+const resultDiv = document.getElementById('result')
 
-    let recognition;
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
+let recognition
+if ('webkitSpeechRecognition' in window) {
+  recognition = new webkitSpeechRecognition()
+} else if ('SpeechRecognition' in window) {
+  recognition = new SpeechRecognition()
+} else {
+  alert('Speech Recognition not supported in this browser.')
+}
 
-      recognition.onresult = function (event) {
-        const transcript = event.results[0][0].transcript;
-        output.textContent = "You said: " + transcript;
-      };
+if (recognition) {
+  recognition.lang = 'en-US'
+  recognition.interimResults = false
+  recognition.maxAlternatives = 1
 
-      recognition.onerror = function (event) {
-        output.textContent = "Error: " + event.error;
-      };
-    } else {
-      output.textContent = "Speech recognition not supported in this browser.";
-      micButton.disabled = true;
+  recognition.onresult = async (event) => {
+    const speechText = event.results[0][0].transcript
+    resultDiv.textContent = `You said: "${speechText}"\n\nWaiting for AI response...`
+
+    const body = {
+      contents: [
+        { parts: [{ text: speechText }] }
+      ]
     }
 
-    micButton.onclick = () => {
-      if (recognition) {
-        recognition.start();
-        output.textContent = "Listening...";
-      }
-    };
-  </script>
+    try {
+      const res = await fetch('https://workers-playground-sweet-truth-533a.amrassal91.workers.dev/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      const data = await res.json()
+
+      // Adjust depending on actual API response structure:
+      const aiReply = data.candidates?.[0]?.content || JSON.stringify(data)
+      resultDiv.textContent = `You said: "${speechText}"\n\nAI says:\n${aiReply}`
+    } catch (err) {
+      resultDiv.textContent = `Error fetching AI response: ${err.message}`
+    }
+  }
+
+  recognition.onerror = (event) => {
+    resultDiv.textContent = `Speech recognition error: ${event.error}`
+  }
+
+  startBtn.onclick = () => {
+    resultDiv.textContent = ''
+    recognition.start()
+  }
+}
+</script>
 </body>
 </html>
