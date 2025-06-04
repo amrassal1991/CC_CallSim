@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Comcast S4 Call Simulator</title>
+  <title>Call Simulator</title>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
@@ -19,7 +19,7 @@
     }
 
     .container {
-      max-width: 800px;
+      max-width: 700px;
       margin: 0 auto;
       background: #fff;
       border-radius: 12px;
@@ -27,16 +27,15 @@
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
     }
 
-    #transcription {
+    #transcript, #ai-response {
       border: 1px solid #ddd;
       padding: 15px;
       margin: 15px 0;
-      max-height: 400px;
+      min-height: 60px;
       text-align: left;
       background: #fefefe;
       border-radius: 8px;
       overflow-y: auto;
-      font-size: 14px;
     }
 
     button {
@@ -49,7 +48,6 @@
     }
 
     #start-btn { background-color: #4CAF50; color: white; }
-    #start-btn.active { background-color: #ff3333; color: white; }
     #send-btn { background-color: #2196F3; color: white; }
     #mic-btn.active { background-color: #ff3333; color: white; }
     #speaker-btn.active { background-color: #ff3333; color: white; }
@@ -68,7 +66,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Comcast S4 Call Simulator 🎧</h1>
+    <h1>Call Simulator 🎧</h1>
     <div id="settings">
       <label>
         <input type="checkbox" id="autoSendCheckbox" checked>
@@ -79,36 +77,36 @@
         <input type="number" id="timeoutSeconds" value="60" min="2" max="120">
       </label>
     </div>
-    <button id="start-btn">🎤 Start Conversation</button>
+    <button id="start-btn">🎤 Start Listening</button>
     <button id="send-btn" disabled>✉️ Send</button>
     <button id="mic-btn" disabled>Microphone: Off</button>
     <button id="speaker-btn" disabled>Speaker: Off</button>
-    <div id="loader">⏳ Processing...</div>
+    <div id="loader">⏳ AI is thinking...</div>
 
-    <h3>Call Transcription:</h3>
-    <div id="transcription">—</div>
+    <h3>You Said:</h3>
+    <div id="transcript">—</div>
+
+    <h3>Customer (AI) Said:</h3>
+    <div id="ai-response">—</div>
   </div>
 
-  <script type="module">
-    import { evaluateS4Response } from './s4_guidelines.js';
+  <script>
+    const WORKER_URL = 'https://workers-playground-tiny-sky-5f02.amrassal91.workers.dev';
 
     const startBtn = document.getElementById('start-btn');
     const sendBtn = document.getElementById('send-btn');
     const micBtn = document.getElementById('mic-btn');
     const speakerBtn = document.getElementById('speaker-btn');
     const loader = document.getElementById('loader');
-    const transcriptionEl = document.getElementById('transcription');
+    const transcriptEl = document.getElementById('transcript');
+    const aiResponseEl = document.getElementById('ai-response');
     const autoSendCheckbox = document.getElementById('autoSendCheckbox');
     const timeoutSecondsInput = document.getElementById('timeoutSeconds');
 
     let recognition, finalTranscript = '', isRecognizing = false;
     let autoSendEnabled = true;
-    let autoSendDelay = 60000;
+    let autoSendDelay = 60000; // 60 seconds
     let autoSendTimer;
-    let callStage = 'S1';
-    let conversationHistory = [];
-    let isSimulationActive = false;
-    let evaluations = [];
 
     function initRecognition() {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -123,6 +121,8 @@
 
       rec.onstart = () => {
         isRecognizing = true;
+        startBtn.textContent = '🛑 Stop';
+        transcriptEl.textContent = 'Listening...';
         micBtn.disabled = false;
         micBtn.classList.add('active');
         micBtn.textContent = 'Microphone: On';
@@ -143,7 +143,7 @@
             interim = t;
           }
         }
-        transcriptionEl.innerHTML = transcriptionEl.innerHTML.replace(/Listening\.\.\.$/, '') + `Agent: ${finalTranscript + interim}<br>`;
+        transcriptEl.textContent = finalTranscript + interim;
         sendBtn.disabled = !finalTranscript.trim();
 
         if (autoSendEnabled && finalTranscript.trim()) {
@@ -155,8 +155,15 @@
       };
 
       rec.onerror = e => {
-        let errorMessage = e.error === 'network' ? 'Network error. Retrying in 3 seconds...' : `Speech error: ${e.error}`;
-        transcriptionEl.innerHTML += `<b>Error:</b> ${errorMessage}<br>`;
+        let errorMessage = '';
+        switch (e.error) {
+          case 'network':
+            errorMessage = 'Network error in speech recognition. Retrying in 3 seconds...';
+            break;
+          default:
+            errorMessage = `Speech error: ${e.error}`;
+        }
+        transcriptEl.textContent = errorMessage;
         console.error('Speech error:', e.error);
         if (isRecognizing) {
           setTimeout(() => {
@@ -166,7 +173,9 @@
       };
 
       rec.onend = () => {
+        // Only update UI if manually stopped
         if (!isRecognizing) {
+          startBtn.textContent = '🎤 Start Listening';
           micBtn.classList.remove('active');
           micBtn.textContent = 'Microphone: Off';
           micBtn.disabled = true;
@@ -180,12 +189,12 @@
     function startRec() {
       if (!recognition) recognition = initRecognition();
       finalTranscript = '';
-      transcriptionEl.innerHTML += 'Listening...<br>';
+      transcriptEl.textContent = '';
       sendBtn.disabled = true;
       try {
         recognition.start();
       } catch (e) {
-        transcriptionEl.innerHTML += '<b>Error:</b> Microphone access denied.<br>';
+        transcriptEl.textContent = 'Microphone access denied. Please allow access.';
         stopRec();
       }
     }
@@ -198,69 +207,35 @@
       }
     }
 
-    function sendMessage(text) {
-      if (!text || !isSimulationActive) return;
-      stopRec();
+    async function sendMessage(text) {
+      if (!text) return;
+      stopRec(); // Stop microphone during AI response
       sendBtn.disabled = true;
       loader.style.display = 'block';
+      aiResponseEl.textContent = '';
       speakerBtn.disabled = false;
       speakerBtn.classList.add('active');
       speakerBtn.textContent = 'Speaker: On';
 
-      transcriptionEl.innerHTML = transcriptionEl.innerHTML.replace(/Listening\.\.\.$/, '') + `<b>Agent:</b> ${text}<br>`;
-
       try {
-        // Evaluate agent response, store for later
-        const evaluation = evaluateS4Response(text, callStage, conversationHistory);
-        evaluations.push({ text, comment: evaluation.comment, score: evaluation.score });
-        conversationHistory.push({ role: 'agent', content: text });
+        const payload = { contents: [{ parts: [{ text }] }] };
+        const res = await fetch(WORKER_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
 
-        // Hardcoded customer response
-        let reply = '';
-        const lowerText = text.toLowerCase();
-        if (conversationHistory.length === 1 && lowerText.match(/name|first|last|who/i)) {
-          reply = 'Hello, this is Mark Smith.';
-        } else if (lowerText.match(/how can i assist|help you today/i)) {
-          reply = 'My bill is doubled and I didn’t subscribe for any extra services. Would you check that for me?';
-        } else if (lowerText.match(/verify your account/i)) {
-          reply = 'Yes, sure.';
-        } else if (lowerText.match(/provide.*account number|address|telephone/i)) {
-          reply = 'Sure, my service address is 15 Northwest St, Ohio, 13557. My account number is 891700588128567. And my telephone number is 636-554-8121.';
-        } else if (lowerText.match(/checking your bill/i)) {
-          reply = 'Thank you.';
-        } else if (lowerText.match(/reason for the increase/i)) {
-          reply = 'Thank you so much. That’s appreciated.';
-        } else if (lowerText.match(/fixed.*200/i)) {
-          reply = 'No, that’s all of it.';
-        } else if (lowerText.match(/mobile.*discount/i)) {
-          reply = 'Yeah, that looks like a good offer, so please schedule the callback for tomorrow at 2:00 PM Eastern Time.';
-        } else if (lowerText.match(/schedule.*callback/i)) {
-          reply = 'No, that is all of it.';
-        } else {
-          reply = 'I’m not sure how to respond to that. Can you assist with my bill issue?';
-        }
-
-        transcriptionEl.innerHTML += `<b>Customer:</b> ${reply}<br>`;
-        conversationHistory.push({ role: 'customer', content: reply });
-        transcriptionEl.scrollTop = transcriptionEl.scrollHeight;
-
-        // Update call stage
-        if (callStage === 'S1' && lowerText.match(/fixed|corrected/i)) {
-          callStage = 'S2';
-        } else if (callStage === 'S2' && lowerText.match(/offer|discount/i)) {
-          callStage = 'S3';
-        } else if (callStage === 'S3' && lowerText.match(/anything else|lovely day/i)) {
-          callStage = 'S4';
-        }
-
+        const data = await res.json();
+        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || '(No response)';
+        aiResponseEl.textContent = reply;
         speak(reply, () => {
-          if (isSimulationActive) startRec();
+          startRec(); // Automatically start microphone after TTS
         });
       } catch (e) {
-        transcriptionEl.innerHTML += `<b>Error:</b> ${e.message}<br>`;
-        console.error('Error:', e);
-        speak('Error: Unable to respond.', () => {
-          if (isSimulationActive) startRec();
+        aiResponseEl.textContent = 'AI Error: ' + e.message;
+        console.error('Fetch failed:', e);
+        speak('Error: Unable to get AI response.', () => {
+          startRec(); // Start microphone after error message
         });
       } finally {
         loader.style.display = 'none';
@@ -273,7 +248,7 @@
     function speak(text, callback) {
       if (!window.speechSynthesis) {
         console.log('Speech synthesis not supported.');
-        if (callback) callback();
+        if (callback) callback(); // Proceed to callback if no TTS
         return;
       }
       const utter = new SpeechSynthesisUtterance(text);
@@ -285,45 +260,13 @@
       window.speechSynthesis.speak(utter);
     }
 
-    function resetSimulation() {
-      stopRec();
-      isSimulationActive = false;
-      callStage = 'S1';
-      conversationHistory = [];
-
-      // Display evaluation summary
-      if (evaluations.length > 0) {
-        transcriptionEl.innerHTML += '<br><b>Evaluation Summary:</b><br>';
-        evaluations.forEach((eval, index) => {
-          transcriptionEl.innerHTML += `<b>Agent ${index + 1}:</b> ${eval.text}<br>${eval.comment}<br>`;
-        });
-      }
-
-      evaluations = [];
-      startBtn.textContent = '🎤 Start Conversation';
-      startBtn.classList.remove('active');
-      sendBtn.disabled = true;
-      micBtn.disabled = true;
-      speakerBtn.disabled = true;
-      transcriptionEl.scrollTop = transcriptionEl.scrollHeight;
-    }
-
     startBtn.addEventListener('click', () => {
-      if (isSimulationActive) {
-        resetSimulation();
-      } else {
-        isSimulationActive = true;
-        startBtn.textContent = '🛑 End Conversation';
-        startBtn.classList.add('active');
-        transcriptionEl.innerHTML = '';
-        evaluations = [];
-        startRec();
-      }
+      isRecognizing ? stopRec() : startRec();
     });
 
     sendBtn.addEventListener('click', () => {
       clearTimeout(autoSendTimer);
-      sendMessage(finalTranscript);
+      sendMessage(finalTranscript.trim());
     });
 
     autoSendCheckbox.addEventListener('change', (e) => {
@@ -334,7 +277,7 @@
     });
 
     timeoutSecondsInput.addEventListener('input', (e) => {
-      autoSendDelay = parseInt(e.target.value) * 1000 || 60000;
+      autoSendDelay = parseInt(e.target.value) * 1000;
     });
   </script>
 </body>
