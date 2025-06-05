@@ -1,1415 +1,1670 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Enhanced AI Call Simulator</title>
-    <!-- Tailwind CSS CDN for utility-first styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts - Inter for a modern look -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Font Awesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Call Simulator Comcast SMB wave. 24</title>
+  <style>
+    :root {
+      --bg-main: #0a0a0a;
+      --bg-container: #1a1a1a;
+      --bg-message-ai: #2d2d2d;
+      --bg-message-user: #1a6cd0;
+      --text-main: #ffffff;
+      --text-secondary: #a0a0a0;
+      --accent-color: #1a6cd0;
+      --success-color: #10b981;
+      --error-color: #ef4444;
+      --quality-bg: #2d2d2d; /* Darker background for quality panel */
+      --quality-border: #444;
+      --quality-score-good: #10b981; /* Green for good score */
+      --quality-score-bad: #ef4444; /* Red for bad score */
+      --quality-score-neutral: #f59e0b; /* Amber for neutral/needs improvement */
+      color-scheme: dark;  /* Tells browser this is a dark theme */
+    }
 
-    <style>
-        /* Custom CSS for a dark theme with smooth transitions and specific element styling */
-        :root {
-            --bg-main: #0a0a0a;
-            --bg-container: #1a1a1a;
-            --bg-message-ai: #2d2d2d;
-            --bg-message-user: #1a6cd0;
-            --text-main: #ffffff;
-            --text-secondary: #a0a0a0;
-            --accent-color: #1a6cd0;
-            --success-color: #10b981;
-            --error-color: #ef4444;
-            --quality-bg: #2d2d2d;
-            --quality-border: #444;
-            --quality-score-good: #10b981;
-            --quality-score-bad: #ef4444;
-            --quality-score-neutral: #f59e0b;
-            color-scheme: dark;
-        }
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-main);
+      color: var(--text-main);
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-main);
-            color: var(--text-main);
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 1rem; /* Padding for mobile view */
-            box-sizing: border-box;
-        }
+    .main-layout {
+      flex: 1;
+      max-width: 1200px; /* Increased max-width to accommodate two columns */
+      margin: 1rem auto;
+      width: 100%;
+      display: flex;
+      gap: 1rem; /* Gap between chat and quality panel */
+      height: calc(100vh - 2rem);
+      flex-direction: row; /* Default for desktop */
+    }
 
-        /* Responsive container sizing */
-        #app-container {
-            background-color: var(--bg-container);
-            border-radius: 1rem;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
-            display: flex;
-            flex-direction: column; /* Stack vertically on smaller screens */
-            width: 100%;
-            max-width: 90%; /* Max width for desktop */
-            height: 90vh; /* Responsive height */
-            overflow: hidden;
-            transition: all 0.3s ease-in-out;
-        }
+    .container {
+      flex: 2.5; /* Chat container takes more space */
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      background: var(--bg-container);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+      border-radius: 12px;
+      backdrop-filter: blur(10px);
+    }
 
-        @media (min-width: 768px) {
-            #app-container {
-                flex-direction: row; /* Side-by-side on larger screens */
-                max-width: 1200px;
-                height: 85vh;
-            }
-        }
+    .quality-panel-wrapper {
+      flex: 1.5; /* Quality panel wrapper takes less space */
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
 
-        .chat-section {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            padding: 1.5rem;
-            overflow: hidden; /* Important for chat scrolling */
-            border-radius: 1rem; /* Rounded corners */
-        }
+    .quality-panel {
+      background: var(--quality-bg);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+      border-radius: 12px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--quality-border);
+      flex: 2; /* Increased flex to make it bigger */
+    }
 
-        .messages {
-            flex-grow: 1;
-            overflow-y: auto;
-            padding-right: 0.5rem; /* Space for scrollbar */
-            margin-bottom: 1rem;
-            scroll-behavior: smooth;
-        }
+    .quality-panel h2 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 1rem;
+      text-align: center;
+    }
 
-        .message {
-            margin-bottom: 0.75rem;
-            padding: 0.75rem 1rem;
-            border-radius: 0.75rem;
-            max-width: 85%;
-            word-wrap: break-word; /* Ensure long words break */
-        }
+    .quality-feedback-content {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 0.5rem; /* For scrollbar space */
+    }
 
-        .message.user {
-            background-color: var(--bg-message-user);
-            margin-left: auto;
-            color: var(--text-main);
-        }
+    .quality-comment {
+      background: rgba(255,255,255,0.05);
+      border-left: 4px solid var(--quality-score-neutral);
+      padding: 0.8rem;
+      border-radius: 8px;
+      margin-bottom: 0.8rem;
+      font-size: 0.9rem;
+      line-height: 1.4;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      position: relative; /* For info button positioning */
+    }
 
-        .message.ai {
-            background-color: var(--bg-message-ai);
-            margin-right: auto;
-            color: var(--text-main);
-        }
+    .quality-comment.good { border-color: var(--quality-score-good); }
+    .quality-comment.bad { border-color: var(--quality-score-bad); }
 
-        .controls {
-            display: flex;
-            gap: 0.75rem;
-            padding-top: 1rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
+    .quality-comment strong {
+      color: var(--text-main);
+    }
 
-        .control-btn {
-            background-color: var(--accent-color);
-            color: var(--text-main);
-            padding: 0.75rem 1.25rem;
-            border-radius: 0.75rem;
-            border: none;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            flex-grow: 1; /* Allow buttons to grow */
-        }
+    .quality-feedback-content::-webkit-scrollbar {
+      width: 6px;
+    }
 
-        .control-btn:hover:not(:disabled) {
-            background-color: #155bb3; /* Darker shade of accent */
-            transform: translateY(-2px);
-        }
+    .quality-feedback-content::-webkit-scrollbar-track {
+      background: var(--quality-bg);
+    }
 
-        .control-btn:disabled {
-            background-color: #4a4a4a;
-            cursor: not-allowed;
-            opacity: 0.7;
-        }
+    .quality-feedback-content::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.2);
+      border-radius: 3px;
+    }
 
-        .status-text {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            margin-top: 0.5rem;
-            text-align: center;
-        }
+    .quality-feedback-content::-webkit-scrollbar-thumb:hover {
+      background: rgba(255,255,255,0.3);
+    }
 
-        .loader {
-            border: 4px solid rgba(255, 255, 255, 0.2);
-            border-top: 4px solid var(--accent-color);
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 1s linear infinite;
-            display: none; /* Hidden by default */
-            margin: 1rem auto;
-        }
+    /* Info button for quality feedback */
+    .quality-info-btn {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        cursor: pointer;
+        opacity: 0.7;
+        transition: opacity 0.2s, color 0.2s;
+    }
+    .quality-info-btn:hover {
+        opacity: 1;
+        color: var(--accent-color);
+    }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+    @media (max-width: 768px) {
+      .main-layout {
+        flex-direction: column;
+        height: auto;
+        margin: 0.5rem;
+      }
+      .container, .quality-panel, .quality-panel-wrapper {
+        flex: none;
+        width: auto;
+        margin-bottom: 1rem;
+      }
+      .quality-panel, .s4-progress-panel {
+        height: auto; /* Allow height to adjust on mobile */
+      }
+    }
 
-        /* Quality Feedback Panel Styling */
-        .quality-panel {
-            background-color: var(--quality-bg);
-            border-left: 1px solid var(--quality-border);
-            padding: 1.5rem;
-            width: 100%; /* Full width on small screens */
-            max-height: 50%; /* Limit height on small screens */
-            overflow-y: auto;
-            box-sizing: border-box;
-        }
+    .header {
+      background: var(--accent-color);
+      color: var(--text-main);
+      padding: 1rem;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-top-left-radius: 12px;
+      border-top-right-radius: 12px;
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
 
-        @media (min-width: 768px) {
-            .quality-panel {
-                width: 350px; /* Fixed width on larger screens */
-                min-width: 300px; /* Ensures it doesn't shrink too much */
-                max-height: 100%; /* Full height */
-            }
-        }
+    .header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
 
-        .quality-panel h3 {
-            color: var(--text-main);
-            font-size: 1.25rem;
-            margin-bottom: 1rem;
-            font-weight: 600;
-        }
+    .chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      background: var(--bg-container);
+    }
 
-        .quality-score {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            text-align: center;
-        }
+    .messages {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+      padding-bottom: 1rem;
+    }
 
-        .score-good { color: var(--quality-score-good); }
-        .score-bad { color: var(--quality-score-bad); }
-        .score-neutral { color: var(--quality-score-neutral); }
+    .message {
+      max-width: 70%;
+      padding: 0.8rem 1rem;
+      border-radius: 1rem;
+      position: relative;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      animation: fadeIn 0.3s ease-in;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      transition: all 0.2s ease-out;
+    }
 
-        .quality-comment {
-            background-color: rgba(255, 255, 255, 0.05);
-            border-radius: 0.5rem;
-            padding: 1rem;
-            font-size: 0.95rem;
-            line-height: 1.4;
-            color: var(--text-secondary);
-            margin-bottom: 1rem;
-        }
+    /* Typing indicator animation */
+    .message.user:not(.sent)::after {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 4px;
+      background: rgba(255,255,255,0.7);
+      border-radius: 50%;
+      margin-left: 4px;
+      vertical-align: middle;
+      animation: blink 1s infinite;
+    }
 
-        .quality-section-summary {
-            margin-top: 1rem;
-            padding-top: 1rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
+    .message.user {
+      align-self: flex-end;
+      background: var(--bg-message-user);
+      color: white;
+      border-bottom-right-radius: 0.4rem;
+      margin-left: 2rem;
+    }
 
-        .quality-section-item {
-            margin-bottom: 0.5rem;
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-        }
+    .message.ai {
+      align-self: flex-start;
+      background: var(--bg-message-ai);
+      color: var(--text-main);
+      border-bottom-left-radius: 0.4rem;
+      margin-right: 2rem;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
 
-        .quality-section-item span:first-child {
-            font-weight: 500;
-            color: var(--text-main);
-        }
+    .message .sender-name {
+        font-weight: bold;
+        margin-bottom: 0.2rem;
+        display: block;
+        color: rgba(255,255,255,0.7);
+        font-size: 0.85rem;
+    }
+    .message.user .sender-name {
+        text-align: right;
+        color: rgba(255,255,255,0.8);
+    }
 
-        /* Modal Styles */
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
-        }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
 
-        .modal.show {
-            opacity: 1;
-            visibility: visible;
-        }
+    /* Custom scrollbar for Webkit browsers */
+    .chat-container::-webkit-scrollbar, .quality-feedback-content::-webkit-scrollbar {
+      width: 8px;
+    }
 
-        .modal-content {
-            background-color: var(--bg-container);
-            padding: 2rem;
-            border-radius: 1rem;
-            width: 90%;
-            max-width: 700px;
-            max-height: 90vh;
-            overflow-y: auto;
-            position: relative;
-            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5);
-            transform: translateY(20px);
-            transition: transform 0.3s ease-in-out;
-        }
+    .chat-container::-webkit-scrollbar-track, .quality-feedback-content::-webkit-scrollbar-track {
+      background: var(--bg-container);
+    }
 
-        .modal.show .modal-content {
-            transform: translateY(0);
-        }
+    .chat-container::-webkit-scrollbar-thumb, .quality-feedback-content::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.2);
+      border-radius: 4px;
+    }
 
-        .modal-close-btn {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: none;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 1.5rem;
-            cursor: pointer;
-            transition: color 0.2s;
-        }
+    .chat-container::-webkit-scrollbar-thumb:hover, .quality-feedback-content::-webkit-scrollbar-thumb:hover {
+      background: rgba(255,255,255,0.3);
+    }
 
-        .modal-close-btn:hover {
-            color: var(--text-main);
-        }
+    .controls {
+      padding: 1rem;
+      background: var(--bg-container);
+      border-top: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+      border-bottom-left-radius: 12px;
+      border-bottom-right-radius: 12px;
+    }
 
-        .modal-body h4 {
-            font-size: 1.1rem;
-            color: var(--text-main);
-            margin-top: 1rem;
-            margin-bottom: 0.5rem;
-        }
+    .button-group {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+    }
 
-        .modal-body ul {
-            list-style: none;
-            padding: 0;
-            margin-bottom: 1rem;
-        }
+    .control-button {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.8rem 1.2rem;
+      border: none;
+      border-radius: 24px;
+      background: var(--accent-color);
+      color: white;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.2s;
+      font-weight: 500;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      backdrop-filter: blur(4px);
+    }
 
-        .modal-body ul li {
-            background-color: rgba(255, 255, 255, 0.03);
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            margin-bottom: 0.4rem;
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+    .control-button:hover:not(:disabled) {
+      background: #006cbd;
+    }
 
-        .modal-body ul li span:first-child {
-            flex-grow: 1;
-            font-weight: 500;
-        }
+    .control-button:disabled {
+      background: #cccccc;
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
 
-        .modal-body .total-score {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--accent-color);
-            text-align: center;
-            margin-top: 1.5rem;
-            padding-top: 1rem;
-            border-top: 1px dashed rgba(255, 255, 255, 0.2);
-        }
+    .control-button .button-icon {
+      font-size: 1.2rem;
+    }
 
-        .export-button {
-            background-color: var(--accent-color);
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.75rem;
-            border: none;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: background-color 0.2s ease-in-out;
-            display: block;
-            width: fit-content;
-            margin: 1.5rem auto 0;
-        }
+    .record-button {
+      background: #10b981;
+    }
 
-        .export-button:hover {
-            background-color: #155bb3;
-        }
+    .record-button:hover:not(:disabled) {
+      background: #059669;
+      transform: translateY(-1px);
+    }
 
-        .user-id-display {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            text-align: center;
-            margin-top: 0.5rem;
-            padding: 0.5rem;
-            background-color: rgba(255, 255, 255, 0.05);
-            border-radius: 0.5rem;
-            word-break: break-all;
-        }
-    </style>
+    .record-button.recording {
+      background: #ef4444;
+      animation: pulse 1.5s infinite;
+    }
+
+    .mute-button {
+      background: #6b7280;
+    }
+
+    .mute-button:hover:not(:disabled) {
+      background: #4b5563;
+    }
+
+    .mute-button.muted {
+      background: #ef4444;
+    }
+
+    .cancel-button {
+      background: #ef4444;
+    }
+
+    .cancel-button:hover:not(:disabled) {
+      background: #dc2626;
+      transform: translateY(-1px);
+    }
+
+    .control-button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+      70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    .status-bar {
+      background: rgba(0,0,0,0.03);
+      padding: 0.5rem;
+      border-radius: 12px;
+      margin-top: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .mic-button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .status {
+      flex: 1;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    #loader {
+      display: none;
+      color: var(--accent-color);
+      font-size: 0.9rem;
+    }
+
+    /* Modal styles */
+    .modal {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    .modal.show {
+      opacity: 1;
+      visibility: visible;
+    }
+    .modal-content {
+      background: #23272f;
+      color: #fff;
+      border-radius: 10px;
+      padding: 2rem;
+      min-width: 320px;
+      max-width: 90vw;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      position: relative; /* For close button positioning */
+    }
+    .modal-content label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      font-size: 1rem;
+    }
+    .modal-content input[type="text"],
+    .modal-content input[type="number"],
+    .modal-content select,
+    .modal-content textarea {
+      margin-top: 0.2rem;
+      border-radius: 6px;
+      border: 1px solid #444;
+      background: #181c22;
+      color: #fff;
+      padding: 0.4rem 0.6rem;
+      font-size: 1rem;
+    }
+    .modal-content textarea {
+      resize: vertical;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+    }
+    .modal-actions button {
+      background: var(--accent-color);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .modal-actions button:hover {
+      background: #0e4a8a;
+    }
+    .modal-close-button {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .modal-close-button:hover {
+      color: var(--text-main);
+    }
+
+    /* S4 Progress Panel */
+    .s4-progress-panel {
+        background: var(--quality-bg);
+        box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+        border-radius: 12px;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        border: 1px solid var(--quality-border);
+        flex: 1; /* Reduced flex to make it smaller */
+    }
+
+    .s4-progress-panel h2 {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: var(--text-main);
+        margin-bottom: 0.5rem;
+        text-align: center;
+    }
+
+    .s4-phase {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        padding: 0.6rem 0.8rem;
+        background: rgba(255,255,255,0.05);
+        border-radius: 8px;
+        transition: background 0.3s ease;
+    }
+
+    .s4-phase.active {
+        background: rgba(26, 108, 208, 0.2); /* Light blue for active */
+        border: 1px solid var(--accent-color);
+    }
+    .s4-phase.completed {
+        background: rgba(16, 185, 129, 0.2); /* Light green for completed */
+        border: 1px solid var(--success-color);
+    }
+
+    .s4-indicator-bulb {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background-color: #555; /* Default grey */
+        box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .s4-phase.active .s4-indicator-bulb {
+        background-color: var(--accent-color); /* Neon blue */
+        box-shadow: 0 0 8px var(--accent-color), 0 0 15px var(--accent-color);
+    }
+    .s4-phase.completed .s4-indicator-bulb {
+        background-color: var(--success-color); /* Neon green */
+        box-shadow: 0 0 8px var(--success-color), 0 0 15px var(--success-color);
+    }
+
+    .s4-phase-content {
+        flex: 1;
+    }
+
+    .s4-phase-title {
+        font-weight: 600;
+        color: var(--text-main);
+        font-size: 1rem;
+    }
+
+    .s4-phase-description {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin-top: 0.2rem;
+    }
+  </style>
 </head>
-<body class="antialiased">
-    <div id="app-container" class="flex flex-col md:flex-row bg-gray-900 rounded-2xl shadow-xl overflow-hidden">
-        <!-- Chat Section -->
-        <div class="chat-section flex flex-col flex-grow p-6 md:p-8">
-            <h2 class="text-2xl md:text-3xl font-bold text-white mb-4 text-center">AI Call Simulator</h2>
-            <div id="chat" class="messages flex-grow overflow-y-auto pr-2 mb-4 rounded-lg">
-                <!-- Messages will be appended here -->
-            </div>
-            <div class="user-id-display" id="user-id-display">
-                Loading User ID...
-            </div>
-            <div class="status-text text-gray-400 text-sm mt-2 mb-4 text-center" id="status">
-                Initializing...
-            </div>
-            <div class="loader" id="loader"></div>
-            <div class="controls flex gap-3 pt-4 border-t border-gray-700">
-                <button id="mic-btn" class="control-btn bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-5 rounded-xl flex-grow disabled:bg-gray-700">
-                    <i class="fas fa-microphone"></i> <span id="mic-btn-text">Start Mic</span>
-                </button>
-                <button id="send-btn" class="control-btn bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-5 rounded-xl flex-grow disabled:bg-gray-700" disabled>
-                    <i class="fas fa-paper-plane"></i> Send
-                </button>
-                <button id="cancel-btn" class="control-btn bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-5 rounded-xl flex-grow disabled:bg-gray-700" disabled>
-                    <i class="fas fa-times"></i> Cancel
-                </button>
-                <button id="mute-btn" class="control-btn bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-5 rounded-xl flex-grow-0 w-12 disabled:bg-gray-700">
-                    <i class="fas fa-volume-up" id="mute-icon"></i>
-                </button>
-            </div>
+<body>
+  <div class="main-layout">
+    <!-- Quality and S4 panel wrapper - now on the left -->
+    <div class="quality-panel-wrapper">
+      <div class="quality-panel">
+        <h2>Quality Feedback</h2>
+        <div class="quality-feedback-content" id="quality-feedback-panel">
+          <div class="quality-comment">Feedback will appear here after each of your responses.</div>
         </div>
-
-        <!-- Quality Feedback Panel -->
-        <div id="quality-feedback-panel" class="quality-panel bg-gray-800 p-6 md:p-8 flex flex-col">
-            <h3 class="text-xl md:text-2xl font-semibold text-white mb-4 text-center">Live Quality Coach</h3>
-            <div class="quality-score text-green-500 mb-4" id="quality-score">0</div>
-            <div class="quality-comment bg-gray-700 rounded-lg p-4 text-gray-300 text-sm mb-4" id="quality-comment">
-                No feedback yet. Agent responses will be evaluated here.
+      </div>
+      <div class="s4-progress-panel">
+        <h2>S4 Progress</h2>
+        <div id="s4-phases-container">
+          <div class="s4-phase" id="s1-phase">
+            <div class="s4-indicator-bulb"></div>
+            <div class="s4-phase-content">
+              <div class="s4-phase-title">S1: Start</div>
+              <div class="s4-phase-description">Greeting, Reflect Reason, Empathize, Take Ownership, Authenticate/Set Agenda.</div>
             </div>
-            <div class="quality-section-summary text-sm flex-grow overflow-y-auto pr-2">
-                <h4 class="text-md font-medium text-white mb-2">Section Scores:</h4>
-                <div id="section-scores">
-                    <!-- Section scores will be displayed here dynamically -->
-                    <div class="quality-section-item"><span>S1: Start</span><span id="s1-score">N/A</span></div>
-                    <div class="quality-section-item"><span>S2: Solve</span><span id="s2-score">N/A</span></div>
-                    <div class="quality-section-item"><span>S3: Sell</span><span id="s3-score">N/A</span></div>
-                    <div class="quality-section-item"><span>S4: Summarize</span><span id="s4-score">N/A</span></div>
-                    <div class="quality-section-item"><span>Behaviors</span><span id="behaviors-score">N/A</span></div>
-                </div>
+          </div>
+          <div class="s4-phase" id="s2-phase">
+            <div class="s4-indicator-bulb"></div>
+            <div class="s4-phase-content">
+              <div class="s4-phase-title">S2: Solve</div>
+              <div class="s4-phase-description">Obtain Info/Probe, Resolve Issue, Build Value/Promote.</div>
             </div>
+          </div>
+          <div class="s4-phase" id="s3-phase">
+            <div class="s4-indicator-bulb"></div>
+            <div class="s4-phase-content">
+              <div class="s4-phase-title">S3: Sell</div>
+              <div class="s4-phase-description">Transition to Offer, Present Offer, Overcome Objections, Proactively Close Sale.</div>
+            </div>
+          </div>
+          <div class="s4-phase" id="s4-phase">
+            <div class="s4-indicator-bulb"></div>
+            <div class="s4-phase-content">
+              <div class="s4-phase-title">S4: Summarize</div>
+              <div class="s4-phase-description">Summarize Actions, Close Contact, Documentation.</div>
+            </div>
+          </div>
         </div>
+      </div>
     </div>
 
-    <!-- Post-Call Summary Modal -->
-    <div id="post-call-modal" class="modal">
-        <div class="modal-content">
-            <button class="modal-close-btn" id="modal-close-btn">&times;</button>
-            <h3 class="text-2xl font-bold text-white mb-4 text-center">Call Summary Report</h3>
-            <div class="modal-body">
-                <div class="auto-fail-status mb-4 text-center" id="auto-fail-status" style="display: none;">
-                    <p class="text-red-500 font-bold text-lg"><i class="fas fa-exclamation-triangle"></i> AUTO-FAIL DETECTED!</p>
-                    <p class="text-red-400 text-sm" id="auto-fail-reason"></p>
-                </div>
-
-                <div class="section-details" id="modal-section-details">
-                    <!-- Detailed section breakdown will be populated here -->
-                </div>
-
-                <div class="total-score" id="modal-total-score">
-                    Overall Score: <span class="text-blue-500">0</span> / 100
-                </div>
-
-                <button id="export-report-btn" class="export-button bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-xl mt-6">
-                    Export Report (JSON)
-                </button>
-            </div>
+    <div class="container">
+      <div class="header">
+        <h1>Call Simulator 🎧</h1>
+      </div>
+      <div class="chat-container" id="chat">
+        <div class="messages">
+          <!-- Initial message will be added by startNewRolePlay() -->
         </div>
+      </div>
+      <div class="controls">
+        <div class="button-group">
+          <button class="control-button record-button" id="mic-btn" title="Start/Stop recording">
+            <span class="button-icon">🎤</span>
+            <span class="button-text">Hold to Talk</span>
+          </button>
+          <button class="control-button mute-button" id="mute-btn" title="Mute/Unmute microphone">
+            <span class="button-icon">🔊</span>
+            <span class="button-text">Mute</span>
+          </button>
+          <button class="control-button send-button" id="send-btn" disabled title="Send message">
+            <span class="button-icon">📤</span>
+            <span class="button-text">Send</span>
+          </button>
+          <button class="control-button cancel-button" id="cancel-btn" disabled title="Cancel recording">
+            <span class="button-icon">❌</span>
+            <span class="button-text">Cancel</span>
+          </button>
+          <button class="control-button" id="save-call-btn" title="Save current call">
+            <span class="button-icon">💾</span>
+            <span class="button-text">Save Call</span>
+          </button>
+        </div>
+        <div class="status-bar">
+          <div class="status" id="status">Click microphone to start</div>
+          <div id="loader">⏳ Processing...</div>
+        </div>
+      </div>
+
+      <!-- Modal open buttons (positioned absolutely within the main container) -->
+      <div class="modal-buttons" style="position:absolute;top:1rem;right:1rem;z-index:200;">
+        <button id="open-settings" class="control-button" style="background: #4b5563; padding: 0.5rem; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;" title="Settings">⚙️</button>
+        <button id="open-persona" class="control-button" style="background: #4b5563; padding: 0.5rem; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; margin-left: 0.5rem;" title="Persona">🧑‍💼</button>
+      </div>
     </div>
+  </div>
 
-    <script type="module">
-        // Firebase global variables provided by the Canvas environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+  <!-- Generic Modal Structure -->
+  <div id="genericModal" class="modal">
+    <div class="modal-content">
+      <button class="modal-close-button" id="closeModalBtn">&times;</button>
+      <h3 id="modalTitle" style="font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem;"></h3>
+      <div id="modalBody"></div>
+      <div class="modal-actions">
+        <button id="modalSaveBtn">Save</button>
+        <button id="modalCancelBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
 
-        // Firebase Imports
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, addDoc, getDocs, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+  <!-- Include Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Constants for Gemini API and Quality Guidelines
-        const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=`; // API key left empty as per instructions
-        const IMAGE_GENERATION_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=`; // For future image generation, if needed
+    // Global Firebase variables
+    let app;
+    let db;
+    let auth;
+    let userId = 'anonymous'; // Default to anonymous
 
-        // SCORING_GUIDELINES_SUMMARY content moved here from s4_guidelines.html
-        const SCORING_GUIDELINES_SUMMARY = `
-You are an expert Comcast Quality Assurance specialist. Your task is to analyze a given call transcript and score the agent's performance strictly according to the Comcast S4 Quality Training Material guidelines.
+    // Access global variables provided by the Canvas environment
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; // Corrected initialization
 
-Here are the scoring guidelines for each section (ME = Meets Expectations, HE = Highly Effective, BE = Below Expectations, N/A = Not Applicable):
+    // Initialize Firebase and authenticate
+    if (firebaseConfig) {
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
 
-S1: START (Max 22 points)
-- 1. Greeting (Max 3 points): Agent greets clearly (Comcast Name, Agent First Name, offer assistance). BE=0 if incomplete/rushed.
-- 2. Reflect, Relate, Empathize (Max 15 points): Reflects call reason, empathizes with customer, assures action. BE=0 if vague, uses "trap" words, no ownership.
-- 3. Set Agenda / Auth / Plant Seed (Max 4 points): Sets agenda, authenticates caller, "plants seed" for account review (HE=4, ME=2). BE=0 if fails any.
-
-S2: SOLVE (Max 27 points)
-- 4. Obtain Info / Probe (Max 7 points): Asks effective questions, probes root causes (HE=7, ME=4). BE=0 if makes assumptions, no opportunity for customer to describe problem.
-- 5. Resolve / Address Issue(s) (Max 14 points): Explains problem cause, provides complete resolution, educates on prevention, resolves underlying issues (HE=14, ME=7). BE=0 if incomplete, insufficient info, no confirmation.
-- 6. Build Value / Enhance (Max 6 points): Attempts email capture AND builds value of EXISTING Comcast products/services/company. BE=0 if fails any.
-
-S3: SELL (Max 20 points) - ONLY APPLICABLE IF CUSTOMER IS NOT IRATE, AUTHENTICATED, AND HASN'T OPTED OUT OF SALES.
-- 7. Transition to Relevant Offer (Max 6 points): Transitions after resolving issue, uses bridging statements, probes for needs (HE=6, ME=3). BE=0 if transitions too early, no bridging.
-- 8. Present Offer (Max 6 points): Presents tailored recommendation, discusses benefits/value (HE=6, ME=3). BE=0 if only price, no benefits.
-- 9. Overcome Objections (Max 4 points): Acknowledges objection, attempts to overcome resistance (HE=4, ME=2). BE=0 if poor attempt, aggressive. N/A if customer accepts without resistance.
-- 10. Proactively Ask for the Sale (Max 4 points): Uses closing techniques (e.g., choice, assumptive, urgency) (ME=4). BE=0 if discusses solution but doesn't ask. N/A if customer pre-purchases or rejects after objection handling.
-
-S4: SUMMARIZE (Max 14 points)
-- 11. Summarize Actions (Max 7 points): Provides clear next steps, documents resolution, validates sales (ME=7). BE=0 if no recap or next steps.
-- 12. Close Contact (Max 4 points): Offers additional assistance, personalized closing, shows appreciation (ME=4). BE=0 if fails any.
-- 13. Documentation (Max 3 points): Documents caller, reason, resolution/actions (ME=3). BE=0 if missing required info. (Cannot be fully assessed from transcript alone).
-
-Behaviors (Max 17 points) - Assessed throughout the call:
-- Tone, Confidence & Clarity (Max 3 points): Professional, pleasant, clear, unrushed pace. BE=0 if fails.
-- Active Listening (Max 3 points): Verbal cues, avoids interruption, references customer info. BE=0 if fails.
-- Contact Management (Max 3 points): Minimizes dead air (<20s), manages holds (<60s) with explanation. BE=0 if fails.
-- Acknowledge / Take Responsibility (Max 4 points): Assures solution, positive language, avoids blame. BE=0 if fails.
-- Build Rapport / Demonstrate Concern (Max 4 points): Genuine interest, acknowledges feelings, personalizes interaction. BE=0 if fails.
-
-Critical Failure Policies:
-- Section Failures (Deduct points from specific section):
-    - Authentication (S1 Failure): Disclosing info to non-authorized user. Deducts all 22 points from S1.
-    - Account Actions (S2 Failure): Misinforming about charges, failing promises, not escalating supervisor call. Deducts all 27 points from S2.
-    - TPV Process (S4 Failure): Failure to attempt Third Party Verification where required. Deducts all 14 points from S4.
-- Auto-Fail Behaviors (Results in 0 overall score for the entire call):
-    - Rudeness (verbal): Rude, disrespectful, arguing, profanity, hanging up, refusing escalation/transfer.
-    - Call Avoidance: Failing to answer, personal calls/web surfing.
-    - Inappropriate Transfer: Blind transfer, advocating for customers to contact other departments.
-
-Return a JSON object with the following structure. Strictly adhere to this JSON format for parsing.
-{
-  "autoFailDetected": boolean,
-  "autoFailReason": "string (if auto-fail, otherwise empty)",
-  "sections": {
-    "s1": { "score": number, "max": number, "criteria": [ { "name": string, "awardedScore": number|string, "maxScore": number|string, "justification": string } ] },
-    "s2": { "score": number, "max": number, "criteria": [ { "name": string, "awardedScore": number|string, "maxScore": number|string, "justification": string } ] },
-    "s3": { "score": number, "max": number, "criteria": [ { "name": string, "awardedScore": number|string, "maxScore": number|string, "justification": string } ] },
-    "s4": { "score": number, "max": number, "criteria": [ { "name": string, "awardedScore": number|string, "maxScore": number|string, "justification": string } ] },
-    "behaviors": { "score": number, "max": number, "criteria": [ { "name": string, "awardedScore": number|string, "maxScore": number|string, "justification": string } ] }
-  }
-}
-        `;
-
-        /**
-         * @class SpeechService
-         * @description Manages speech synthesis (Text-to-Speech) for the application.
-         * Handles loading voices, speaking text, and stopping speech.
-         */
-        class SpeechService {
-            constructor() {
-                if (!window.speechSynthesis) {
-                    console.error('Speech synthesis not supported');
-                    return;
-                }
-
-                this.synthesis = window.speechSynthesis;
-                this.voices = [];
-                this.isSpeaking = false;
-                this.volume = 0.8; // Default volume
-                this.defaultVoice = null;
-
-                // Load voices immediately and set up a listener for when voices change (e.g., in Chrome)
-                this.loadVoices();
-                if (window.speechSynthesis.onvoiceschanged !== undefined) {
-                    window.speechSynthesis.onvoiceschanged = () => {
-                        this.loadVoices();
-                    };
-                }
-            }
-
-            /**
-             * Attempts to load available speech synthesis voices. Retries if no voices are found initially.
-             * @param {number} retryCount - Number of retries.
-             * @returns {Promise<SpeechSynthesisVoice[]>} A promise that resolves with the list of voices.
-             */
-            async loadVoices(retryCount = 5) {
-                return new Promise((resolve, reject) => {
-                    const attemptLoad = (attempts) => {
-                        this.voices = this.synthesis.getVoices();
-                        console.log(`[SpeechService] Attempt ${6 - attempts}: Found ${this.voices.length} voices`);
-
-                        if (this.voices.length > 0) {
-                            // Prioritize a US English voice if available, otherwise pick the first English voice
-                            this.defaultVoice = this.voices.find(voice => voice.lang === 'en-US') ||
-                                                this.voices.find(voice => voice.lang.startsWith('en')) ||
-                                                this.voices[0]; // Fallback to any voice
-
-                            console.log('[SpeechService] Available voices:', this.voices.map(v => `${v.name} (${v.lang})`));
-                            console.log('[SpeechService] Default voice selected:', this.defaultVoice?.name);
-                            resolve(this.voices);
-                        } else if (attempts > 1) {
-                            console.log('[SpeechService] No voices found, retrying...');
-                            setTimeout(() => attemptLoad(attempts - 1), 100);
-                        } else {
-                            console.error('[SpeechService] Failed to load voices after multiple attempts');
-                            reject(new Error('No voices found for speech synthesis.'));
-                        }
-                    };
-                    attemptLoad(retryCount);
-                });
-            }
-
-            /**
-             * Speaks the given text using the selected voice.
-             * @param {string} text - The text to speak.
-             * @returns {Promise<void>} A promise that resolves when speech ends, or rejects on error.
-             */
-            async speak(text) {
-                if (!this.synthesis || !this.defaultVoice || !text) {
-                    console.warn('[SpeechService] Speech synthesis not ready or no text provided.', { synthesis: this.synthesis, defaultVoice: this.defaultVoice, text });
-                    return Promise.resolve(); // Resolve silently if cannot speak
-                }
-
-                if (this.isSpeaking) {
-                    this.stop(); // Stop any ongoing speech
-                }
-
-                return new Promise((resolve, reject) => {
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.voice = this.defaultVoice;
-                    utterance.volume = this.volume;
-                    utterance.pitch = 1.0;
-                    utterance.rate = 0.9; // Slightly slower for better clarity
-
-                    console.log('[SpeechService] Speaking:', {
-                        text: text.substring(0, Math.min(text.length, 50)) + (text.length > 50 ? '...' : ''),
-                        voice: this.defaultVoice.name,
-                        volume: this.volume,
-                        lang: utterance.lang
-                    });
-
-                    this.isSpeaking = true;
-
-                    utterance.onstart = () => {
-                        console.log('[SpeechService] Speech started');
-                    };
-
-                    utterance.onend = () => {
-                        console.log('[SpeechService] Speech ended');
-                        this.isSpeaking = false;
-                        resolve();
-                    };
-
-                    utterance.onerror = (err) => {
-                        console.error('[SpeechService] Speech error:', err);
-                        this.isSpeaking = false;
-                        reject(err);
-                    };
-
-                    // Small delay to ensure proper initialization and prevent errors on rapid calls
-                    setTimeout(() => {
-                        try {
-                            this.synthesis.speak(utterance);
-                        } catch (error) {
-                            console.error('[SpeechService] Error initiating speech:', error);
-                            this.isSpeaking = false;
-                            reject(error);
-                        }
-                    }, 100);
-                });
-            }
-
-            /**
-             * Stops any ongoing speech synthesis.
-             */
-            stop() {
-                if (this.synthesis) {
-                    this.synthesis.cancel();
-                    this.isSpeaking = false;
-                    console.log('[SpeechService] Speech cancelled');
-                }
-            }
-        }
-
-
-        /**
-         * @class ComplaintsService
-         * @description Handles communication with the Gemini API for customer responses and quality feedback.
-         * Manages chat history and constructs prompts for LLM.
-         */
-        class ComplaintsService {
-            constructor() {
-                // API_KEY is intentionally left empty as per instructions. Canvas will provide it at runtime.
-                this.API_KEY = "";
-                this.GEMINI_API_URL = GEMINI_API_URL;
-
-                this.customerPersona = "You are a Comcast customer with a billing inquiry. You are slightly frustrated but polite. Respond concisely.";
-                this.qualityAssistantPersona = "You are an S4 Quality Assurance Specialist. Evaluate the agent's last response based on the S4 guidelines provided. Focus on Start, Solve, Sell, Summarize, and Foundational Behaviors.";
-                this.chatHistory = []; // Stores the full conversation for LLM context
-            }
-
-            /**
-             * Makes an API call to Gemini to get a customer's response based on the agent's message.
-             * @param {string} agentMessage - The agent's last message.
-             * @returns {Promise<string>} The customer's generated response.
-             */
-            async getCustomerResponse(agentMessage) {
-                // Add the agent's message to history before sending to the LLM
-                this.chatHistory.push({ role: "user", parts: [{ text: agentMessage }] });
-
-                const customerPrompt = `Customer Persona: ${this.customerPersona}\n\nAgent: "${agentMessage}"\nCustomer:`;
-
-                const payload = {
-                    contents: this.chatHistory.concat([{
-                        role: "user",
-                        parts: [{ text: customerPrompt }]
-                    }])
-                };
-
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                console.log("Firebase authenticated. User ID:", userId);
+            } else {
+                console.log("Firebase not authenticated. Attempting anonymous sign-in.");
                 try {
-                    const response = await fetch(this.GEMINI_API_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({}));
-                        throw new Error(`API Error: ${response.statusText} - ${JSON.stringify(errorData)}`);
-                    }
-
-                    const data = await response.json();
-                    const customerReply = data.candidates?.[0]?.content?.parts?.[0]?.text || '(No customer response)';
-
-                    // Add the customer's reply to chat history
-                    this.chatHistory.push({ role: "model", parts: [{ text: customerReply }] });
-
-                    return customerReply;
-
-                } catch (error) {
-                    console.error("Gemini API Error (Customer Response):", error);
-                    return `(Error: Could not get customer response - ${error.message})`;
-                }
-            }
-
-            /**
-             * Generates a quality feedback report from the LLM based on the full transcript.
-             * @param {string} transcript - The complete conversation transcript.
-             * @returns {Promise<object>} The parsed JSON quality report.
-             */
-            async getQualityFeedback(transcript) {
-                const prompt = `${SCORING_GUIDELINES_SUMMARY}\n\nCall Transcript:\n\`\`\`\n${transcript}\n\`\`\``;
-                let chatHistoryForQuality = [];
-                chatHistoryForQuality.push({ role: "user", parts: [{ text: prompt }] });
-
-                const payload = {
-                    contents: chatHistoryForQuality,
-                    generationConfig: {
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: "OBJECT",
-                            properties: {
-                                "autoFailDetected": { "type": "BOOLEAN" },
-                                "autoFailReason": { "type": "STRING" },
-                                "totalScore": { "type": "NUMBER" }, // Added for overall score
-                                "sections": {
-                                    "type": "OBJECT",
-                                    "properties": {
-                                        "s1": { "type": "OBJECT", "properties": { "score": { "type": "NUMBER" }, "max": { "type": "NUMBER" }, "criteria": { "type": "ARRAY", "items": { "type": "OBJECT", "properties": { "name": { "type": "STRING" }, "awardedScore": { "type": ["NUMBER", "STRING"] }, "maxScore": { "type": ["NUMBER", "STRING"] }, "justification": { "type": "STRING" } } } } } },
-                                        "s2": { "type": "OBJECT", "properties": { "score": { "type": "NUMBER" }, "max": { "type": "NUMBER" }, "criteria": { "type": "ARRAY", "items": { "type": "OBJECT", "properties": { "name": { "type": "STRING" }, "awardedScore": { "type": ["NUMBER", "STRING"] }, "maxScore": { "type": ["NUMBER", "STRING"] }, "justification": { "type": "STRING" } } } } } },
-                                        "s3": { "type": "OBJECT", "properties": { "score": { "type": "NUMBER" }, "max": { "type": "NUMBER" }, "criteria": { "type": "ARRAY", "items": { "type": "OBJECT", "properties": { "name": { "type": "STRING" }, "awardedScore": { "type": ["NUMBER", "STRING"] }, "maxScore": { "type": ["NUMBER", "STRING"] }, "justification": { "type": "STRING" } } } } } },
-                                        "s4": { "type": "OBJECT", "properties": { "score": { "type": "NUMBER" }, "max": { "type": "NUMBER" }, "criteria": { "type": "ARRAY", "items": { "type": "OBJECT", "properties": { "name": { "type": "STRING" }, "awardedScore": { "type": ["NUMBER", "STRING"] }, "maxScore": { "type": ["NUMBER", "STRING"] }, "justification": { "type": "STRING" } } } } } },
-                                        "behaviors": { "type": "OBJECT", "properties": { "score": { "type": "NUMBER" }, "max": { "type": "NUMBER" }, "criteria": { "type": "ARRAY", "items": { "type": "OBJECT", "properties": { "name": { "type": "STRING" }, "awardedScore": { "type": ["NUMBER", "STRING"] }, "maxScore": { "type": ["NUMBER", "STRING"] }, "justification": { "type": "STRING" } } } } } }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                };
-
-                try {
-                    const response = await fetch(this.GEMINI_API_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({}));
-                        throw new Error(`API Error: ${response.statusText} - ${JSON.stringify(errorData)}`);
-                    }
-
-                    const result = await response.json();
-
-                    if (result.candidates && result.candidates.length > 0 &&
-                        result.candidates[0].content && result.candidates[0].content.parts &&
-                        result.candidates[0].content.parts.length > 0) {
-
-                        const jsonString = result.candidates[0].content.parts[0].text;
-                        const parsedResults = JSON.parse(jsonString);
-
-                        // Calculate total score if not provided by LLM (though schema asks for it now)
-                        if (typeof parsedResults.totalScore === 'undefined') {
-                            let totalScore = 0;
-                            if (!parsedResults.autoFailDetected && parsedResults.sections) {
-                                totalScore += parsedResults.sections.s1?.score || 0;
-                                totalScore += parsedResults.sections.s2?.score || 0;
-                                totalScore += parsedResults.sections.s3?.score || 0;
-                                totalScore += parsedResults.sections.s4?.score || 0;
-                                totalScore += parsedResults.sections.behaviors?.score || 0;
-                            }
-                            parsedResults.totalScore = totalScore;
-                        }
-
-                        return parsedResults;
-
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                        userId = auth.currentUser.uid;
+                        console.log("Signed in with custom token. User ID:", userId);
                     } else {
-                        console.error('LLM response structure unexpected:', result);
-                        return {
-                            autoFailDetected: false,
-                            autoFailReason: 'LLM returned no content or malformed content.',
-                            totalScore: 0,
-                            sections: {},
-                            comment: "No detailed quality feedback received."
-                        };
+                        await signInAnonymously(auth);
+                        userId = auth.currentUser.uid;
+                        console.log("Signed in anonymously. User ID:", userId);
                     }
                 } catch (error) {
-                    console.error('Error scoring call with LLM:', error);
-                    return {
-                        autoFailDetected: false,
-                        autoFailReason: `API call failed: ${error.message}`,
-                        totalScore: 0,
-                        sections: {},
-                        comment: `Error: Could not get quality feedback - ${error.message}`
-                    };
+                    console.error("Firebase authentication failed:", error);
+                    // Fallback to a random UUID if anonymous sign-in fails (e.g., no internet)
+                    userId = crypto.randomUUID();
+                    console.warn("Using a random UUID as userId due to authentication failure:", userId);
                 }
             }
-
-            /**
-             * Clears the internal chat history.
-             */
-            clearHistory() {
-                this.chatHistory = [];
-            }
-
-            /**
-             * Provides the initial customer scenario.
-             * @returns {string} The initial customer statement.
-             */
-            getInitialScenario() {
-                return "Hello, I'm calling about my internet service.";
-            }
-        }
-
-
-        /**
-         * @class CallSimulator
-         * @description Main application logic for the call simulator.
-         * Manages UI, speech recognition, chat flow, and integration with services.
-         */
-        class CallSimulator {
-            constructor() {
-                this.speechService = new SpeechService();
-                this.complaintsService = new ComplaintsService();
-
-                // Firebase properties
-                this.firebaseApp = null;
-                this.db = null;
-                this.auth = null;
-                this.userId = 'anonymous'; // Default to anonymous
-                this.isAuthReady = false; // Flag to indicate if auth state is determined
-
-                this.bindElements();
-                this.initializeState();
-                this.addEventListeners();
-                this.setupFirebase(); // Initialize Firebase
-            }
-
-            /**
-             * Binds DOM elements to class properties for easy access.
-             */
-            bindElements() {
-                this.micBtn = document.getElementById('mic-btn');
-                this.micBtnText = document.getElementById('mic-btn-text');
-                this.sendBtn = document.getElementById('send-btn');
-                this.cancelBtn = document.getElementById('cancel-btn');
-                this.muteBtn = document.getElementById('mute-btn');
-                this.muteIcon = document.getElementById('mute-icon');
-                this.chatDiv = document.getElementById('chat'); // Renamed from this.chat to avoid conflict with chat history
-                this.statusDiv = document.getElementById('status');
-                this.loaderDiv = document.getElementById('loader');
-                this.qualityFeedbackPanel = document.getElementById('quality-feedback-panel');
-                this.qualityScoreDisplay = document.getElementById('quality-score');
-                this.qualityCommentDisplay = document.getElementById('quality-comment');
-                this.sectionScoresDisplay = document.getElementById('section-scores');
-                this.userIdDisplay = document.getElementById('user-id-display');
-
-                // Modal elements
-                this.postCallModal = document.getElementById('post-call-modal');
-                this.modalCloseBtn = document.getElementById('modal-close-btn');
-                this.modalSectionDetails = document.getElementById('modal-section-details');
-                this.modalTotalScore = document.getElementById('modal-total-score');
-                this.exportReportBtn = document.getElementById('export-report-btn');
-                this.autoFailStatus = document.getElementById('auto-fail-status');
-                this.autoFailReason = document.getElementById('auto-fail-reason');
-            }
-
-            /**
-             * Initializes the application's state variables.
-             */
-            initializeState() {
-                this.recognition = null;
-                this.isRecognizing = false;
-                this.currentTranscript = '';
-                this.silenceTimer = null;
-                this.isMuted = false;
-                this.autoSendDelay = 2000; // 2 seconds of silence before auto-send
-                this.fullTranscript = []; // Stores {speaker: 'user'/'ai', text: 'message'} for full call quality assessment
-                this.latestQualityReport = null; // Stores the last received quality report
-            }
-
-            /**
-             * Sets up Firebase authentication and Firestore.
-             */
-            async setupFirebase() {
-                if (firebaseConfig) {
-                    this.firebaseApp = initializeApp(firebaseConfig);
-                    this.db = getFirestore(this.firebaseApp);
-                    this.auth = getAuth(this.firebaseApp);
-
-                    onAuthStateChanged(this.auth, async (user) => {
-                        if (user) {
-                            this.userId = user.uid;
-                            console.log('Firebase: User signed in:', this.userId);
-                        } else {
-                            // Sign in anonymously if no token is provided or user logs out
-                            try {
-                                if (initialAuthToken) {
-                                    await signInWithCustomToken(this.auth, initialAuthToken);
-                                } else {
-                                    await signInAnonymously(this.auth);
-                                }
-                                this.userId = this.auth.currentUser?.uid || crypto.randomUUID(); // Fallback if anonymous fails
-                                console.log('Firebase: Signed in anonymously or with custom token:', this.userId);
-                            } catch (error) {
-                                console.error('Firebase: Anonymous sign-in failed:', error);
-                                // Generate a random ID if Firebase auth fails completely
-                                this.userId = crypto.randomUUID();
-                                this.addMessage(`Error: Could not authenticate with Firebase. Functionality may be limited. User ID: ${this.userId}`, 'ai');
-                            }
-                        }
-                        this.isAuthReady = true;
-                        this.userIdDisplay.textContent = `Your Session ID: ${this.userId}`;
-                        console.log('Firebase: Auth state ready, loading history...');
-                        this.loadChatHistoryFromFirestore();
-                    });
-                } else {
-                    console.error('Firebase config not found. Running without persistence.');
-                    this.isAuthReady = true; // Still allow app to run
-                    this.userId = crypto.randomUUID();
-                    this.userIdDisplay.textContent = `Your Session ID: ${this.userId} (No Persistence)`;
-                }
-            }
-
-            /**
-             * Adds event listeners to control buttons.
-             */
-            addEventListeners() {
-                this.micBtn.addEventListener('click', () => this.toggleRecognition());
-                this.sendBtn.addEventListener('click', () => this.handleSendClick());
-                this.cancelBtn.addEventListener('click', () => this.handleCancelClick());
-                this.muteBtn.addEventListener('click', () => this.toggleMute());
-                this.modalCloseBtn.addEventListener('click', () => this.postCallModal.classList.remove('show'));
-                this.exportReportBtn.addEventListener('click', () => this.exportQualityReport());
-            }
-
-            /**
-             * Updates the status message displayed in the UI.
-             * @param {string} message - The status message to display.
-             * @param {boolean} showLoader - Whether to show or hide the loading spinner.
-             */
-            updateStatus(message, showLoader) {
-                this.statusDiv.textContent = message;
-                this.loaderDiv.style.display = showLoader ? 'block' : 'none';
-                // Update button states based on recognition state
-                this.micBtn.disabled = showLoader; // Disable mic during processing
-                this.sendBtn.disabled = showLoader || !this.currentTranscript.trim();
-                this.cancelBtn.disabled = showLoader;
-                this.muteBtn.disabled = showLoader;
-            }
-
-            /**
-             * Displays a new message in the chat interface.
-             * @param {string} text - The message text.
-             * @param {'user' | 'ai'} sender - The sender of the message ('user' or 'ai').
-             */
-            addMessage(text, sender) {
-                const div = document.createElement('div');
-                div.className = `message ${sender}`;
-                div.textContent = text;
-                this.chatDiv.appendChild(div);
-                this.chatDiv.scrollTop = this.chatDiv.scrollHeight; // Scroll to bottom
-            }
-
-            /**
-             * Saves a chat message to Firestore.
-             * @param {string} text - The message text.
-             * @param {'user' | 'ai'} sender - The sender of the message ('user' or 'ai').
-             */
-            async saveMessageToFirestore(text, sender) {
-                if (!this.db || !this.isAuthReady) {
-                    console.warn('Firestore not ready, skipping save message.');
-                    return;
-                }
-                try {
-                    await addDoc(collection(this.db, `artifacts/${appId}/users/${this.userId}/chats`), {
-                        text,
-                        sender,
-                        timestamp: serverTimestamp(),
-                        appId: appId,
-                        userId: this.userId
-                    });
-                } catch (e) {
-                    console.error("Error adding document to Firestore: ", e);
-                }
-            }
-
-            /**
-             * Loads chat history from Firestore and displays it.
-             */
-            async loadChatHistoryFromFirestore() {
-                if (!this.db || !this.isAuthReady) {
-                    console.warn('Firestore not ready, skipping load message.');
-                    return;
-                }
-                this.chatDiv.innerHTML = ''; // Clear existing messages
-                this.fullTranscript = []; // Clear transcript for fresh load
-
-                const q = query(collection(this.db, `artifacts/${appId}/users/${this.userId}/chats`), orderBy('timestamp'));
-                onSnapshot(q, (snapshot) => {
-                    this.chatDiv.innerHTML = ''; // Clear on every update to re-render
-                    this.fullTranscript = [];
-                    snapshot.forEach((doc) => {
-                        const data = doc.data();
-                        this.addMessage(data.text, data.sender);
-                        this.fullTranscript.push({ speaker: data.sender, text: data.text });
-                    });
-                    this.chatDiv.scrollTop = this.chatDiv.scrollHeight;
-                }, (error) => {
-                    console.error("Error listening to chat history: ", error);
-                    this.addMessage('Error loading chat history.', 'ai');
-                });
-            }
-
-            /**
-             * Saves a quality feedback report to Firestore.
-             * @param {object} feedback - The quality feedback object.
-             */
-            async saveQualityFeedbackToFirestore(feedback) {
-                if (!this.db || !this.isAuthReady) {
-                    console.warn('Firestore not ready, skipping save quality feedback.');
-                    return;
-                }
-                try {
-                    await addDoc(collection(this.db, `artifacts/${appId}/users/${this.userId}/qualityFeedback`), {
-                        report: feedback,
-                        timestamp: serverTimestamp(),
-                        appId: appId,
-                        userId: this.userId,
-                        transcript: this.fullTranscript.map(m => `${m.speaker === 'user' ? 'Agent' : 'Customer'}: ${m.text}`).join('\n') // Save the full transcript for context
-                    });
-                    console.log('Quality feedback saved to Firestore.');
-                } catch (e) {
-                    console.error("Error adding quality feedback to Firestore: ", e);
-                }
-            }
-
-            /**
-             * Initializes speech recognition (if supported by browser).
-             */
-            initRecognition() {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!SpeechRecognition) {
-                    this.updateStatus('Speech recognition not supported in this browser.', false);
-                    this.micBtn.disabled = true;
-                    return;
-                }
-
-                this.recognition = new SpeechRecognition();
-                this.recognition.continuous = false; // Process one utterance at a time
-                this.recognition.interimResults = true; // Get interim results to show live transcript
-                this.recognition.lang = 'en-US';
-
-                this.recognition.onstart = () => {
-                    this.isRecognizing = true;
-                    this.micBtnText.textContent = 'Stop Mic';
-                    this.updateStatus('Listening...', true);
-                    this.sendBtn.disabled = true; // Disable send until speech detected
-                    this.cancelBtn.disabled = false;
-                    clearTimeout(this.silenceTimer);
-                };
-
-                this.recognition.onresult = (event) => {
-                    let interimTranscript = '';
-                    let finalTranscript = '';
-
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        const transcriptPart = event.results[i][0].transcript;
-                        if (event.results[i].isFinal) {
-                            finalTranscript += transcriptPart;
-                        } else {
-                            interimTranscript += transcriptPart;
-                        }
-                    }
-                    this.currentTranscript = finalTranscript || interimTranscript;
-
-                    // Update the last user message or create a new one for interim results
-                    const messages = this.chatDiv.querySelector('.messages');
-                    let lastMessage = messages.lastElementChild;
-
-                    if (lastMessage && lastMessage.classList.contains('user') && !lastMessage.classList.contains('sent')) {
-                        lastMessage.textContent = `(You): ${this.currentTranscript}`;
-                    } else {
-                        // Create a temporary message if it's the first bit of speech
-                        this.addMessage(`(You): ${this.currentTranscript}`, 'user');
-                        lastMessage = messages.lastElementChild;
-                    }
-
-                    // Mark as sent if it's a final transcript
-                    if (finalTranscript) {
-                        lastMessage.classList.add('sent');
-                        this.sendBtn.disabled = false; // Enable send button on final transcript
-                        clearTimeout(this.silenceTimer);
-                        this.silenceTimer = setTimeout(() => {
-                            this.handleSendClick(); // Auto-send after silence
-                        }, this.autoSendDelay);
-                    }
-                    this.chatDiv.scrollTop = this.chatDiv.scrollHeight; // Scroll to bottom
-                };
-
-                this.recognition.onend = () => {
-                    this.isRecognizing = false;
-                    this.micBtnText.textContent = 'Start Mic';
-                    this.updateStatus('Click mic to start', false);
-                    clearTimeout(this.silenceTimer);
-                    // If no final transcript was sent, allow send button if currentTranscript has content
-                    this.sendBtn.disabled = !this.currentTranscript.trim();
-                    this.cancelBtn.disabled = true; // Disable cancel if recognition has ended
-                };
-
-                this.recognition.onerror = (event) => {
-                    console.error('Speech recognition error:', event.error);
-                    this.isRecognizing = false;
-                    this.micBtnText.textContent = 'Start Mic';
-                    this.updateStatus(`Error: ${event.error}. Click mic to retry.`, false);
-                    this.micBtn.disabled = false;
-                    this.sendBtn.disabled = true;
-                    this.cancelBtn.disabled = true;
-                    clearTimeout(this.silenceTimer);
-                };
-            }
-
-            /**
-             * Toggles speech recognition on/off.
-             */
-            toggleRecognition() {
-                if (this.isRecognizing) {
-                    this.recognition.stop();
-                } else {
-                    this.currentTranscript = ''; // Clear previous transcript
-                    // Remove any unsent temporary user message
-                    const messages = this.chatDiv.querySelector('.messages');
-                    const lastMessage = messages.lastElementChild;
-                    if (lastMessage && lastMessage.classList.contains('user') && !lastMessage.classList.contains('sent')) {
-                        lastMessage.remove();
-                    }
-                    this.recognition.start();
-                }
-            }
-
-            /**
-             * Handles sending the user's message (agent's response).
-             */
-            async handleSendClick() {
-                const agentMessage = this.currentTranscript.trim();
-                if (!agentMessage) return;
-
-                this.recognition.stop(); // Ensure recognition is stopped
-                this.updateStatus('Sending message...', true);
-                this.sendBtn.disabled = true;
-                this.cancelBtn.disabled = true;
-
-                // Ensure the final user message is marked as sent and displayed correctly
-                const messages = this.chatDiv.querySelector('.messages');
-                let lastMessage = messages.lastElementChild;
-                if (lastMessage && lastMessage.classList.contains('user') && !lastMessage.classList.contains('sent')) {
-                    lastMessage.textContent = `You: ${agentMessage}`;
-                    lastMessage.classList.add('sent');
-                } else {
-                    this.addMessage(`You: ${agentMessage}`, 'user');
-                }
-                this.fullTranscript.push({ speaker: 'user', text: agentMessage }); // Add to full transcript
-                await this.saveMessageToFirestore(agentMessage, 'user'); // Save to Firestore
-
-                this.currentTranscript = ''; // Clear transcript for next input
-
-                try {
-                    // Get customer response
-                    const customerResponse = await this.complaintsService.getCustomerResponse(agentMessage);
-                    this.addMessage(`Customer: ${customerResponse}`, 'ai');
-                    this.fullTranscript.push({ speaker: 'ai', text: customerResponse }); // Add to full transcript
-                    await this.saveMessageToFirestore(customerResponse, 'ai'); // Save to Firestore
-
-                    if (!this.isMuted) {
-                        this.updateStatus('Speaking...', true);
-                        await this.speechService.speak(customerResponse);
-                    }
-
-                    // Get and display quality feedback after customer response
-                    this.updateStatus('Analyzing quality...', true);
-                    const currentTranscriptText = this.fullTranscript.map(m => {
-                        const speakerPrefix = m.speaker === 'user' ? 'Agent' : 'Customer';
-                        return `${speakerPrefix}: ${m.text}`;
-                    }).join('\n');
-
-                    this.latestQualityReport = await this.complaintsService.getQualityFeedback(currentTranscriptText);
-                    this.displayQualityFeedback(this.latestQualityReport);
-                    await this.saveQualityFeedbackToFirestore(this.latestQualityReport); // Save quality report to Firestore
-
-                } catch (error) {
-                    console.error('Error during message processing:', error);
-                    this.addMessage(`System Error: ${error.message}`, 'ai');
-                } finally {
-                    this.updateStatus('Click mic to start', false);
-                    this.micBtn.disabled = false;
-                    this.sendBtn.disabled = true;
-                    this.cancelBtn.disabled = false; // Allow cancel if user wants to clear partial transcript
-                }
-            }
-
-            /**
-             * Handles the cancel button click, clearing the current transcript.
-             */
-            handleCancelClick() {
-                this.currentTranscript = '';
-                this.recognition.stop(); // Stop recognition
-                // Remove any unsent user message from display
-                const messages = this.chatDiv.querySelector('.messages');
-                const lastMessage = messages.lastElementChild;
-                if (lastMessage && lastMessage.classList.contains('user') && !lastMessage.classList.contains('sent')) {
-                    lastMessage.remove();
-                }
-                this.updateStatus('Click mic to start', false);
-                this.sendBtn.disabled = true;
-            }
-
-            /**
-             * Toggles the mute state for speech output.
-             */
-            toggleMute() {
-                this.isMuted = !this.isMuted;
-                if (this.isMuted) {
-                    this.speechService.stop(); // Stop any ongoing speech
-                    this.muteIcon.classList.replace('fa-volume-up', 'fa-volume-mute');
-                    this.muteBtn.classList.remove('bg-purple-600', 'hover:bg-purple-700');
-                    this.muteBtn.classList.add('bg-gray-500', 'hover:bg-gray-600');
-                } else {
-                    this.muteIcon.classList.replace('fa-volume-mute', 'fa-volume-up');
-                    this.muteBtn.classList.remove('bg-gray-500', 'hover:bg-gray-600');
-                    this.muteBtn.classList.add('bg-purple-600', 'hover:bg-purple-700');
-                }
-                console.log('Mute status:', this.isMuted);
-            }
-
-            /**
-             * Displays the quality feedback in the dedicated panel.
-             * @param {object} report - The quality report object.
-             */
-            displayQualityFeedback(report) {
-                if (!report) {
-                    this.qualityScoreDisplay.textContent = 'N/A';
-                    this.qualityCommentDisplay.textContent = 'No detailed report available.';
-                    this.qualityScoreDisplay.className = 'quality-score score-neutral';
-                    this.sectionScoresDisplay.innerHTML = `
-                        <div class="quality-section-item"><span>S1: Start</span><span>N/A</span></div>
-                        <div class="quality-section-item"><span>S2: Solve</span><span>N/A</span></div>
-                        <div class="quality-section-item"><span>S3: Sell</span><span>N/A</span></div>
-                        <div class="quality-section-item"><span>S4: Summarize</span><span>N/A</span></div>
-                        <div class="quality-section-item"><span>Behaviors</span><span>N/A</span></div>
-                    `;
-                    return;
-                }
-
-                this.qualityScoreDisplay.textContent = report.totalScore;
-                if (report.autoFailDetected) {
-                    this.qualityScoreDisplay.className = 'quality-score score-bad';
-                    this.qualityCommentDisplay.innerHTML = `<span class="font-bold text-red-400">Auto-Fail:</span> ${report.autoFailReason || 'Reason not specified.'}`;
-                } else {
-                    if (report.totalScore >= 80) {
-                        this.qualityScoreDisplay.className = 'quality-score score-good';
-                    } else if (report.totalScore >= 50) {
-                        this.qualityScoreDisplay.className = 'quality-score score-neutral';
-                    } else {
-                        this.qualityScoreDisplay.className = 'quality-score score-bad';
-                    }
-                    this.qualityCommentDisplay.textContent = report.comment || 'Overall performance feedback.'; // Assuming comment property exists
-                }
-
-                // Update section scores
-                const sections = report.sections;
-                this.sectionScoresDisplay.innerHTML = ''; // Clear previous scores
-                for (const key in sections) {
-                    if (sections.hasOwnProperty(key)) {
-                        const section = sections[key];
-                        const sectionName = key.charAt(0).toUpperCase() + key.slice(1); // Capitalize first letter
-                        const div = document.createElement('div');
-                        div.className = 'quality-section-item';
-                        div.innerHTML = `<span>${sectionName}</span><span>${section.score}/${section.max}</span>`;
-                        this.sectionScoresDisplay.appendChild(div);
-                    }
-                }
-            }
-
-            /**
-             * Displays the post-call summary modal with detailed quality report.
-             */
-            showPostCallSummary() {
-                if (!this.latestQualityReport) {
-                    this.addMessage('No quality report generated for this call.', 'ai');
-                    return;
-                }
-
-                const report = this.latestQualityReport;
-                this.modalSectionDetails.innerHTML = ''; // Clear previous content
-
-                // Auto-fail status
-                if (report.autoFailDetected) {
-                    this.autoFailStatus.style.display = 'block';
-                    this.autoFailReason.textContent = report.autoFailReason;
-                    this.modalTotalScore.querySelector('span').textContent = '0';
-                    this.modalTotalScore.querySelector('span').className = 'text-red-500';
-                } else {
-                    this.autoFailStatus.style.display = 'none';
-                    this.modalTotalScore.querySelector('span').textContent = `${report.totalScore}`;
-                    this.modalTotalScore.querySelector('span').className = 'text-blue-500';
-                }
-
-                // Detailed section breakdown
-                for (const sectionKey in report.sections) {
-                    if (report.sections.hasOwnProperty(sectionKey)) {
-                        const section = report.sections[sectionKey];
-                        const sectionTitle = sectionKey.toUpperCase(); // e.g., S1, S2, BEHAVIORS
-
-                        const sectionDiv = document.createElement('div');
-                        sectionDiv.innerHTML = `<h4 class="text-white font-semibold">${sectionTitle} (${section.score}/${section.max} points)</h4>`;
-                        const ul = document.createElement('ul');
-
-                        if (section.criteria && Array.isArray(section.criteria)) {
-                            section.criteria.forEach(criterion => {
-                                const li = document.createElement('li');
-                                li.innerHTML = `<span>${criterion.name}</span> <span>${criterion.awardedScore}/${criterion.maxScore}</span>`;
-                                ul.appendChild(li);
-                            });
-                        } else {
-                            const li = document.createElement('li');
-                            li.textContent = 'No detailed criteria available.';
-                            ul.appendChild(li);
-                        }
-                        sectionDiv.appendChild(ul);
-                        this.modalSectionDetails.appendChild(sectionDiv);
-                    }
-                }
-
-                this.postCallModal.classList.add('show');
-            }
-
-            /**
-             * Exports the latest quality report as a JSON file.
-             */
-            exportQualityReport() {
-                if (!this.latestQualityReport) {
-                    console.warn('No quality report to export.');
-                    return;
-                }
-                const reportJson = JSON.stringify(this.latestQualityReport, null, 2);
-                const blob = new Blob([reportJson], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `call_quality_report_${new Date().toISOString()}.json`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }
-
-            /**
-             * Starts a new role-play simulation, initializing the chat and UI.
-             */
-            async startNewRolePlay() {
-                this.initRecognition(); // Initialize speech recognition
-                this.chatDiv.innerHTML = ''; // Clear chat history display
-                this.complaintsService.clearHistory(); // Clear LLM's chat history
-                this.fullTranscript = []; // Clear local full transcript
-                this.latestQualityReport = null; // Clear previous report
-                this.displayQualityFeedback(null); // Reset quality panel
-
-                this.updateStatus('Welcome! Click mic to start conversation.', false);
-
-                // Initial welcome message from AI
-                const welcomeMsg = "Welcome to the AI Call Simulator! To use the simulator, please ensure your browser has microphone access enabled.";
-                this.addMessage(welcomeMsg, 'ai');
-                await this.saveMessageToFirestore(welcomeMsg, 'ai');
-
-                // Initial customer scenario
-                const initialScenario = this.complaintsService.getInitialScenario();
-                this.addMessage(`Customer: ${initialScenario}`, 'ai');
-                this.fullTranscript.push({ speaker: 'ai', text: initialScenario });
-                await this.saveMessageToFirestore(initialScenario, 'ai');
-
-
-                // Only speak if not muted and after a small delay to ensure voices are loaded
-                if (!this.isMuted) {
-                    try {
-                        await new Promise(resolve => setTimeout(resolve, 500)); // Small delay for voice loading
-                        await this.speechService.speak(initialScenario);
-                    } catch (err) {
-                        console.error('[CallSimulator] Failed to speak initial message:', err);
-                        this.addMessage('Note: Voice output failed. Please check your audio settings.', 'ai');
-                    }
-                }
-
-                // Prompt user to start
-                this.updateStatus('Click mic to start', false);
-            }
-        }
-
-        // Initialize the simulator when the DOM is ready
-        document.addEventListener('DOMContentLoaded', () => {
-            const simulator = new CallSimulator();
-            simulator.startNewRolePlay();
-
-            // Example: Show post-call summary after some interaction (you might trigger this differently)
-            // setTimeout(() => {
-            //     simulator.showPostCallSummary();
-            // }, 10000); // For demonstration, remove in production
         });
+    } else {
+        console.warn("Firebase config not found. Call saving will not be available.");
+        userId = crypto.randomUUID(); // Generate a random ID if Firebase isn't configured
+        document.getElementById('save-call-btn').disabled = true;
+    }
 
-        // Register Service Worker for PWA capabilities
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(registration => {
-                        console.log('Service Worker registered: ', registration);
-                    })
-                    .catch(registrationError => {
-                        console.log('Service Worker registration failed: ', registrationError);
-                    });
+    // Make Firebase instances and userId available to the global scope
+    window.firebaseApp = app;
+    window.firebaseDb = db;
+    window.firebaseAuth = auth;
+    window.currentUserId = userId; // This will be updated by onAuthStateChanged
+    window.getUserId = () => userId; // Provide a getter for the current userId
+
+    // Expose Firestore FieldValue for serverTimestamp
+    window.firebase = {
+        firestore: {
+            FieldValue: {
+                serverTimestamp: serverTimestamp
+            }
+        }
+    };
+  </script>
+
+  <!-- Include complains.js BEFORE the main script -->
+  <script src="complaints.js"></script>
+
+  <script>
+    // SpeechService Class (from previous 'both.txt' content)
+    class SpeechService {
+        constructor() {
+            this.synthesis = window.speechSynthesis;
+            this.voices = [];
+            this.isSpeaking = false;
+            this.volume = 0.8; // Default volume, can be updated via setVolume
+            
+            if (this.synthesis) {
+                this.synthesis.onvoiceschanged = () => {
+                    this.voices = this.synthesis.getVoices();
+                    console.log('Voices loaded:', this.voices.length);
+                };
+                this.voices = this.synthesis.getVoices(); // Try to load immediately
+            }
+        }
+
+        setVolume(volume) {
+            this.volume = volume;
+            console.log('SpeechService volume set to:', this.volume);
+        }
+
+        getPreferredVoice(gender = null) {
+            const voices = this.voices.filter(voice => voice.lang.includes('en-US'));
+            let preferredVoice = null;
+
+            if (gender === 'male') {
+                preferredVoice = voices.find(voice => voice.name.includes('Male') || voice.name.includes('David'));
+            } else if (gender === 'female') {
+                preferredVoice = voices.find(voice => voice.name.includes('Zira') || voice.name.includes('Samantha') || voice.name.includes('Female'));
+            }
+            
+            return preferredVoice || voices[0] || null; // Fallback to first English voice, then null
+        }
+
+        async speak(text, gender = null) {
+            return new Promise((resolve, reject) => {
+                if (!this.synthesis || !text) {
+                    console.log('Speech synthesis skipped: not available or no text provided.');
+                    return resolve();
+                }
+
+                this.synthesis.cancel(); // Cancel any ongoing speech
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.volume = this.volume;
+                
+                const voice = this.getPreferredVoice(gender);
+                if (voice) {
+                    utterance.voice = voice;
+                    console.log('Using voice:', voice.name, 'for gender:', gender);
+                } else {
+                    console.warn('No suitable voice found for gender:', gender, '. Using default if available.');
+                    if (this.voices.length > 0) {
+                        utterance.voice = this.voices.find(v => v.lang.includes('en-US')) || this.voices[0];
+                    } else {
+                        console.error('No speech synthesis voices available. Ensure voices are installed on your OS.');
+                        return resolve(); // Resolve if no voices at all
+                    }
+                }
+
+                utterance.pitch = 1.0;
+                utterance.rate = 0.9;
+
+                this.isSpeaking = true;
+
+                utterance.onend = () => {
+                    console.log('Speech ended');
+                    this.isSpeaking = false;
+                    // Automatically reactivate microphone if not muted
+                    if (!isMuted) {
+                        startRecognition();
+                    }
+                    resolve();
+                };
+
+                utterance.onerror = (err) => {
+                    console.error('Speech error:', err);
+                    this.isSpeaking = false;
+                    // Automatically reactivate microphone if not muted
+                    if (!isMuted) {
+                        startRecognition();
+                    }
+                    reject(err);
+                };
+
+                // Small delay to ensure synthesis is ready
+                setTimeout(() => {
+                    try {
+                        this.synthesis.speak(utterance);
+                        console.log('Speech synthesis started for:', text);
+                        // Mute microphone while AI is speaking
+                        stopRecognition(); 
+                    } catch (e) {
+                        console.error('Error calling speechSynthesis.speak():', e);
+                        this.isSpeaking = false;
+                        reject(e);
+                    }
+                }, 100);
             });
         }
-    </script>
+
+        stop() {
+            if (this.synthesis) {
+                this.synthesis.cancel();
+                this.isSpeaking = false;
+                console.log('Speech synthesis stopped.');
+            }
+        }
+    }
+
+    const speechService = new SpeechService(); // Instantiate the SpeechService
+
+    // Use the provided API key directly
+    const API_KEY = "AIzaSyAuGsOgCCzlSBvpcelKWcZXBf1FXFx-zMg"; // Changed to empty string as per user request
+    const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+    
+    const micBtn = document.getElementById('mic-btn');
+    const sendBtn = document.getElementById('send-btn');
+    const cancelBtn = document.getElementById('cancel-btn');
+    const chat = document.getElementById('chat');
+    const status = document.getElementById('status');
+    const loader = document.getElementById('loader');
+    const muteBtn = document.getElementById('mute-btn');
+    const qualityFeedbackPanel = document.getElementById('quality-feedback-panel');
+    const saveCallBtn = document.getElementById('save-call-btn'); // New save button
+
+    // S4 Progress elements
+    const s1Phase = document.getElementById('s1-phase');
+    const s2Phase = document.getElementById('s2-phase');
+    const s3Phase = document.getElementById('s3-phase');
+    const s4Phase = document.getElementById('s4-phase');
+    const s4Phases = {
+        'S1': s1Phase,
+        'S2': s2Phase,
+        'S3': s3Phase,
+        'S4': s4Phase
+    };
+
+    // Modal elements
+    const genericModal = document.getElementById('genericModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const modalSaveBtn = document.getElementById('modalSaveBtn'); // Corrected assignment
+    const modalCancelBtn = document.getElementById('modalCancelBtn');
+
+    let recognition;
+    let isRecognizing = false;
+    let currentTranscript = '';
+    let silenceTimer = null;
+    let isMuted = false;
+    let autoSendDelay = 60000; // Default auto-send delay in milliseconds (60 seconds)
+    let lastSpeechEndTime = 0; // To track dead air
+
+    // Chat history for context
+    let chatHistory = []; // This will store alternating user (agent) and model (customer AI) turns
+    let qualityFeedbackHistory = []; // Stores structured quality feedback
+
+    // Initial customer scenario setup - now dynamically set
+    let currentScenario = null; // Stores the full scenario object
+    let currentInitialCustomerScenarioText = ""; // Stores just the initial complaint text
+    let currentS4Phase = 'S1'; // Track current S4 phase
+
+    let customerPersona = "You are a Comcast customer with a billing inquiry. You are slightly frustrated but polite. Respond concisely. Ensure your responses have variance and do not sound robotic.";
+    let qualityAssistantPersona = "You are an S4 Quality Assurance Specialist. Evaluate the agent's last response based on the S4 guidelines provided. Provide a score out of 100 and a brief comment. Focus on Start, Solve, Sell, Summarize, and Foundational Behaviors. Also, identify the current S4 phase (S1, S2, S3, or S4) the conversation is in based on the agent's last response and the overall flow.";
+    let flowManagerPersona = "You are a Call Flow Manager AI. Your role is to guide the agent through the S4 call flow. Based on the conversation history and the current S4 phase, provide a subtle suggestion or prompt to help the agent progress or conclude the call. Your tone should be helpful and encouraging, not critical. Suggest the next logical S4 phase or a concluding action (e.g., 'summarize the call').";
+
+
+    const S4_GUIDELINES_SUMMARY = `
+        S4 Universal Call Flow:
+        - S1: Start (Greeting, Reflect Reason, Relate/Empathize, Take Ownership, Authenticate/Set Agenda)
+        - S2: Solve (Obtain Info/Probe, Resolve Issue, Build Value/Promote)
+        - S3: Sell (Transition to Offer, Present Offer, Overcome Objections, Proactively Close Sale)
+        - S4: Summarize (Summarize Actions, Close Contact, Documentation)
+        Foundational Behaviors: Tone, Confidence, Clarity; Active Listening; Contact Management; Acknowledge/Take Responsibility; Build Rapport/Demonstrate Concern.
+        Scoring: Highly Effective (HE) gives more points than Meets Expectations (ME). Below Expectations (BE) gives 0 points.
+        Critical Failures: Auto-Fail (e.g., Rudeness, Inappropriate Transfer) results in 0 overall. Section Failure (e.g., Authentication failure) results in 0 for that section.
+    `;
+
+    function addMessage(text, sender, senderName = '') {
+      const messages = chat.querySelector('.messages');
+      const div = document.createElement('div');
+      div.className = `message ${sender}`;
+      if (senderName) {
+          const nameSpan = document.createElement('span');
+          nameSpan.className = 'sender-name';
+          nameSpan.textContent = senderName;
+          div.appendChild(nameSpan);
+      }
+      const textNode = document.createTextNode(text);
+      div.appendChild(textNode);
+      messages.appendChild(div);
+      chat.scrollTop = messages.scrollHeight; // Use messages.scrollHeight for more reliable scroll
+    }
+
+    function addQualityFeedback(score, comment, details = {}) {
+      const div = document.createElement('div');
+      div.classList.add('quality-comment');
+      if (score >= 80) {
+        div.classList.add('good');
+      } else if (score < 60) {
+        div.classList.add('bad');
+      }
+      div.innerHTML = `<strong>Score: ${score}/100</strong><br>${comment}`;
+      
+      const infoBtn = document.createElement('button');
+      infoBtn.className = 'quality-info-btn';
+      infoBtn.innerHTML = '💡';
+      infoBtn.title = 'Click for more details';
+      infoBtn.onclick = () => showQualityDetails(details);
+      div.appendChild(infoBtn);
+
+      qualityFeedbackPanel.appendChild(div);
+      qualityFeedbackPanel.scrollTop = qualityFeedbackPanel.scrollHeight;
+      qualityFeedbackHistory.push({ score, comment, details }); // Store structured feedback with details
+    }
+
+    function showQualityDetails(details) {
+        let detailHtml = `<h4>Feedback Details:</h4>`;
+        if (details.s4Phase) {
+            detailHtml += `<p><strong>S4 Phase:</strong> ${details.s4Phase}</p>`;
+        }
+        if (details.confidence !== undefined) {
+            detailHtml += `<p><strong>Speech Confidence:</strong> ${(details.confidence * 100).toFixed(1)}%</p>`;
+        }
+        if (details.deadAirDuration !== undefined) {
+            detailHtml += `<p><strong>Dead Air Duration:</strong> ${details.deadAirDuration.toFixed(1)} seconds</p>`;
+        }
+        if (details.reasoning) {
+            detailHtml += `<p><strong>AI Reasoning:</strong> ${details.reasoning}</p>`;
+        }
+        if (details.suggestions) {
+            detailHtml += `<p><strong>Suggestions:</strong> ${details.suggestions}</p>`;
+        }
+        // Add more details as needed
+        showModal('Quality Feedback Details', detailHtml, null, true); // Pass true to hide save/cancel buttons
+    }
+
+    function updateStatus(message, showLoader = false) {
+      status.textContent = message;
+      loader.style.display = showLoader ? 'inline-block' : 'none';
+      micBtn.disabled = showLoader;
+      sendBtn.disabled = showLoader;
+      cancelBtn.disabled = showLoader;
+      // Mute button should always be active for manual toggle
+      // muteBtn.disabled = showLoader; // Keep mute button active
+    }
+
+    function initRecognition() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) {
+        addMessage('Speech recognition not supported in this browser. Please use Chrome for best experience.', 'ai');
+        micBtn.disabled = true;
+        return null;
+      }
+
+      const rec = new SR();
+      rec.lang = 'en-US';
+      rec.continuous = false;
+      rec.interimResults = true;
+
+      rec.onstart = () => {
+        isRecognizing = true;
+        micBtn.classList.add('recording');
+        sendBtn.disabled = true;
+        cancelBtn.disabled = false;
+        updateStatus('Listening...');
+        currentTranscript = '';
+        clearTimeout(silenceTimer);
+        lastSpeechEndTime = performance.now(); // Reset dead air timer
+      };
+
+      let lastTranscript = '';
+      rec.onresult = (e) => {
+        clearTimeout(silenceTimer); // Reset silence timer on any speech
+        
+        let interimTranscript = '';
+        let finalTranscript = '';
+        let confidence = 0;
+        
+        for (let i = 0; i < e.results.length; i++) {
+          const transcript = e.results[i][0].transcript;
+          if (e.results[i].isFinal) {
+            finalTranscript = transcript;
+            confidence = e.results[i][0].confidence;
+          } else {
+            interimTranscript = transcript;
+          }
+        }
+
+        const fullTranscript = (finalTranscript || interimTranscript).trim();
+        
+        if (fullTranscript !== lastTranscript) {
+          const newWords = fullTranscript.slice(lastTranscript.length).trim();
+          
+          const command = newWords.toLowerCase();
+          if (command === 'send' || command.endsWith(' send')) {
+            if (currentTranscript.trim()) {
+              sendMessage(currentTranscript.trim(), confidence); // Pass confidence
+            }
+            return;
+          } else if (command === 'delete' || command.endsWith(' delete')) {
+            currentTranscript = '';
+            const messages = chat.querySelector('.messages').lastElementChild;
+            if (messages && messages.classList.contains('user') && !messages.classList.contains('sent')) {
+              messages.remove();
+            }
+            return;
+          }
+
+          currentTranscript = fullTranscript;
+          lastTranscript = fullTranscript;
+          lastSpeechEndTime = performance.now(); // Update last speech time
+
+          sendBtn.disabled = !currentTranscript;
+
+          let messageElement = chat.querySelector('.messages').lastElementChild;
+          if (messageElement && messageElement.classList.contains('user') && !messageElement.classList.contains('sent')) {
+            messageElement.textContent = currentTranscript;
+          } else {
+            messageElement = document.createElement('div');
+            messageElement.className = 'message user';
+            messageElement.innerHTML = `<span class="sender-name">Agent:</span>${currentTranscript}`; // Add sender name
+            chat.querySelector('.messages').appendChild(messageElement);
+          }
+          chat.scrollTop = chat.scrollHeight;
+        }
+
+        // Start new silence timer only if currently recognizing and there's a transcript
+        if (isRecognizing && currentTranscript.trim()) {
+            silenceTimer = setTimeout(() => {
+                console.log('Silence detected - auto-sending message');
+                const deadAirDuration = (performance.now() - lastSpeechEndTime) / 1000;
+                sendMessage(currentTranscript.trim(), confidence, deadAirDuration); // Pass confidence and dead air
+            }, autoSendDelay); // Use autoSendDelay
+        }
+      };
+
+      rec.onerror = (e) => {
+        console.error('Speech recognition error:', e.error);
+        if (e.error === 'network') {
+          updateStatus('Network error. Retrying...', true);
+          setTimeout(() => {
+            if (isRecognizing) startRecognition();
+          }, 1000);
+        } else if (e.error === 'not-allowed') {
+            updateStatus('Microphone access denied. Please enable microphone permissions in your browser settings. Then, refresh the page.', false);
+            micBtn.disabled = true; // Disable mic button if permission is denied
+        }
+        else {
+          updateStatus(`Error: ${e.error}`);
+          stopRecognition();
+        }
+      };
+
+      rec.onend = () => {
+        isRecognizing = false;
+        micBtn.classList.remove('recording');
+        cancelBtn.disabled = true;
+        // Only update status if not already showing a permission error
+        if (status.textContent !== 'Microphone access denied. Please enable microphone permissions in your browser settings. Then, refresh the page.') {
+            updateStatus('Click mic to start');
+        }
+        clearTimeout(silenceTimer); // Ensure timer is cleared on end
+        recognition = null; // Reset recognition object to force re-initialization on next start
+      };
+
+      return rec;
+    }
+
+    function startRecognition() {
+      if (isMuted || speechService.isSpeaking) { // Don't start if muted or AI is speaking
+        console.log('Recognition blocked: muted or AI is speaking.');
+        return;
+      }
+      if (!recognition) {
+        recognition = initRecognition();
+        if (!recognition) return; // If initRecognition failed, stop here
+      }
+
+      try {
+        recognition.start();
+        console.log('Recognition started.');
+      } catch (e) {
+        console.error('Failed to start recognition:', e);
+        updateStatus('Failed to access microphone. Please check permissions.');
+      }
+    }
+
+    function stopRecognition() {
+      if (recognition && isRecognizing) {
+        recognition.stop();
+        console.log('Recognition stopped.');
+        clearTimeout(silenceTimer);
+      }
+    }
+
+    function toggleMute() {
+      isMuted = !isMuted;
+      muteBtn.classList.toggle('muted');
+      muteBtn.querySelector('.button-icon').textContent = isMuted ? '🔇' : '🔊';
+      muteBtn.querySelector('.button-text').textContent = isMuted ? 'Unmute' : 'Mute';
+      
+      if (isMuted) {
+        stopRecognition(); // Stop recognition immediately if muted
+        speechService.stop(); // Stop any ongoing speech
+        console.log('Microphone manually muted.');
+      } else {
+        // If unmuted and AI is not speaking, restart recognition
+        if (!speechService.isSpeaking) {
+          startRecognition();
+          console.log('Microphone manually unmuted.');
+        }
+      }
+    }
+
+    async function sendMessage(text, confidence = 0, deadAirDuration = 0) {
+      if (!text.trim()) return;
+      
+      clearTimeout(silenceTimer);
+      stopRecognition(); // Ensure recognition is stopped before sending
+
+      // Mark the last user message as sent
+      const messages = chat.querySelector('.messages').lastElementChild;
+      if (messages && messages.classList.contains('user') && !messages.classList.contains('sent')) {
+        messages.classList.add('sent');
+      } else {
+        // If message was auto-sent without interim display, add it now
+        addMessage(text, 'user', 'Agent:'); // Add sender name
+        chat.querySelector('.messages').lastElementChild.classList.add('sent');
+      }
+
+      const wasMuted = isMuted;
+      isMuted = true; // Temporarily mute during AI processing
+      muteBtn.classList.add('muted');
+      muteBtn.querySelector('.button-icon').textContent = '🔇';
+      
+      updateStatus('Processing...', true);
+
+      try {
+        // --- Role-Play AI (Customer Response) ---
+        // Construct customer payload with persona and initial complaint as system/user context
+        const customerPrompt = `As the customer, respond to the agent's last message.
+        Customer Persona: ${customerPersona}
+        Initial Complaint: "${currentInitialCustomerScenarioText}"
+        Conversation History: ${JSON.stringify(chatHistory.slice(-6))}
+        Agent's Last Message: "${text}"
+        Your response:`;
+
+        const customerPayload = { contents: [{ role: "user", parts: [{ text: customerPrompt }] }] };
+        console.log("Customer AI Request Payload:", JSON.stringify(customerPayload, null, 2));
+
+        const customerRes = await fetch(GEMINI_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(customerPayload)
+        });
+        const customerData = await customerRes.json();
+        console.log("Customer AI Raw Response:", JSON.stringify(customerData, null, 2)); // Log raw response
+
+        let customerReply = '(No customer response)';
+        if (customerData.candidates && customerData.candidates.length > 0 &&
+            customerData.candidates[0].content && customerData.candidates[0].content.parts &&
+            customerData.candidates[0].content.parts.length > 0) {
+            customerReply = customerData.candidates[0].content.parts[0].text;
+        } else {
+            console.error("Customer AI did not return a valid response structure or content:", customerData);
+            customerReply = '(Customer AI did not generate a valid response)';
+        }
+        
+        addMessage(customerReply, 'ai', `${currentScenario.customerName}:`); // Add customer name
+        chatHistory.push({ role: "user", parts: [{ text: text }] }); // Add agent's message to history
+        chatHistory.push({ role: "model", parts: [{ text: customerReply }] }); // Add customer's response to history
+
+        if (!wasMuted) { // Speak only if not originally muted
+          await speechService.speak(customerReply, currentScenario.customerGender); // Use speechService instance with gender
+        }
+
+        // --- Quality AI Analysis ---
+        let precedingCustomerMessageText = '';
+        // Find the most recent 'model' message before the current agent's message in chatHistory
+        for (let i = chatHistory.length - 1; i >= 0; i--) {
+            if (chatHistory[i].role === 'model') {
+                precedingCustomerMessageText = chatHistory[i].parts[0].text;
+                break;
+            }
+        }
+        
+        const qualityPrompt = `As an S4 Quality Assurance Specialist, evaluate the agent's response based on the S4 guidelines. Provide a score out of 100, a brief comment, the current S4 phase (S1, S2, S3, or S4) the conversation is in, your reasoning for the score, and suggestions for improvement or better wordings.
+        S4 Guidelines Summary: ${S4_GUIDELINES_SUMMARY}
+        
+        Here is the conversation turn to evaluate:
+        Customer: "${precedingCustomerMessageText || currentInitialCustomerScenarioText}"
+        Agent: "${text}"
+        
+        Focus specifically on whether the agent's response was appropriate given the customer's statement *immediately preceding* the agent's response (or the initial scenario if this is the first agent response).
+        For the 'Start' phase (S1), ensure the agent reflects the reason for contact and shows empathy *if the reason was provided by the customer*. If no specific reason was explicitly provided yet by the customer, evaluate the general greeting and rapport building.
+        Consider the overall flow and adherence to S4 principles.
+        Also consider the agent's speech characteristics:
+        - Speech Confidence: ${(confidence * 100).toFixed(1)}% (Higher is better)
+        - Dead Air Duration: ${deadAirDuration.toFixed(1)} seconds (Lower is better, typically aim for < 1 second within a turn, but longer pauses between turns are natural)
+        
+        Provide your response in JSON format with the following keys: "score" (integer), "comment" (string), "s4Phase" (string, e.g., "S1", "S2", "S3", "S4" - YOU MUST PROVIDE ONE OF THESE), "reasoning" (string), "suggestions" (string).`;
+            
+        const qualityResponseSchema = {
+            type: "OBJECT",
+            properties: {
+                "score": { "type": "INTEGER" },
+                "comment": { "type": "STRING" },
+                "s4Phase": { "type": "STRING", "enum": ["S1", "S2", "S3", "S4"] },
+                "reasoning": { "type": "STRING" },
+                "suggestions": { "type": "STRING" }
+            },
+            "propertyOrdering": ["score", "comment", "s4Phase", "reasoning", "suggestions"]
+        };
+
+        const qualityPayload = { 
+            contents: [{ role: "user", parts: [{ text: qualityPrompt }] }],
+            generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: qualityResponseSchema
+            }
+        };
+        console.log("Quality AI Request Payload:", JSON.stringify(qualityPayload, null, 2));
+
+        const qualityRes = await fetch(GEMINI_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(qualityPayload)
+        });
+        const qualityData = await qualityRes.json();
+        console.log("Quality AI Raw Response:", JSON.stringify(qualityData, null, 2)); // Log raw response
+        let qualityFeedback = { score: 0, comment: 'Error: Could not get quality feedback.', s4Phase: 'S1', reasoning: 'No reasoning provided.', suggestions: 'No suggestions provided.' }; // Default to S1
+        let qualityDetails = { confidence, deadAirDuration };
+
+        if (qualityData.candidates && qualityData.candidates.length > 0 &&
+            qualityData.candidates[0].content && qualityData.candidates[0].content.parts &&
+            qualityData.candidates[0].content.parts.length > 0) {
+            try {
+                const jsonText = qualityData.candidates[0].content.parts[0].text;
+                const parsedFeedback = JSON.parse(jsonText);
+                qualityFeedback = { ...qualityFeedback, ...parsedFeedback }; // Merge parsed data
+                qualityDetails = { ...qualityDetails, ...parsedFeedback }; // Add AI's reasoning/suggestions to details
+            } catch (parseError) {
+                console.error('Error parsing quality AI JSON:', parseError);
+                qualityFeedback.comment = `Error parsing quality feedback: ${parseError.message}`;
+                qualityDetails.reasoning = `Error parsing quality feedback: ${parseError.message}`;
+            }
+        } else {
+            console.error('Quality AI returned an unexpected structure:', qualityData);
+            qualityFeedback.comment = 'Error: Unexpected quality AI response structure.';
+            qualityDetails.reasoning = 'Unexpected quality AI response structure.';
+        }
+        
+        addQualityFeedback(qualityFeedback.score, qualityFeedback.comment, qualityDetails);
+        currentS4Phase = qualityFeedback.s4Phase; // Update current S4 phase based on quality AI
+        console.log("Quality AI returned S4 Phase:", currentS4Phase); // Log the phase returned by quality AI
+        updateS4Progress(currentS4Phase);
+
+        // --- Flow Management AI ---
+        const flowManagerPrompt = `As a Call Flow Manager AI, your role is to guide the agent through the S4 call flow.
+        Current S4 Phase: ${currentS4Phase}.
+        Conversation History: ${JSON.stringify(chatHistory.slice(-4))} (last 4 turns for context)
+        Agent's Last Response: "${text}"
+        Customer's Last Response: "${customerReply}"
+
+        Based on the current S4 phase and the recent conversation, provide a subtle suggestion or prompt to help the agent progress or conclude the call. Your tone should be helpful and encouraging, not critical.
+        
+        If the current phase is S1, suggest moving towards problem-solving.
+        If the current phase is S2, suggest looking for sales opportunities or resolving the issue fully.
+        If the current phase is S3, suggest closing the sale or moving to summarization if the sale is not viable.
+        If the current phase is S4, suggest concluding the call.
+        If the conversation seems stuck or repetitive, suggest a way to move forward.
+
+        Provide your response in JSON format with the following keys: "suggestion" (string), "nextS4Phase" (string, e.g., "S1", "S2", "S3", "S4", "Completed"), "interventionNeeded" (boolean, true if a strong prompt is needed).`;
+
+        const flowManagerResponseSchema = {
+            type: "OBJECT",
+            properties: {
+                "suggestion": { "type": "STRING" },
+                "nextS4Phase": { "type": "STRING", "enum": ["S1", "S2", "S3", "S4", "Completed"] },
+                "interventionNeeded": { "type": "BOOLEAN" }
+            },
+            "propertyOrdering": ["suggestion", "nextS4Phase", "interventionNeeded"]
+        };
+
+        const flowManagerPayload = {
+            contents: [{ role: "user", parts: [{ text: flowManagerPrompt }] }],
+            generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: flowManagerResponseSchema
+            }
+        };
+        console.log("Flow Manager AI Request Payload:", JSON.stringify(flowManagerPayload, null, 2));
+
+        const flowManagerRes = await fetch(GEMINI_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(flowManagerPayload)
+        });
+        const flowManagerData = await flowManagerRes.json();
+        console.log("Flow Manager AI Raw Response:", JSON.stringify(flowManagerData, null, 2)); // Log raw response
+        let flowManagerFeedback = { suggestion: '', nextS4Phase: currentS4Phase, interventionNeeded: false };
+
+        if (flowManagerData.candidates && flowManagerData.candidates.length > 0 &&
+            flowManagerData.candidates[0].content && flowManagerData.candidates[0].content.parts &&
+            flowManagerData.candidates[0].content.parts.length > 0) {
+            try {
+                const jsonText = flowManagerData.candidates[0].content.parts[0].text;
+                flowManagerFeedback = JSON.parse(jsonText);
+            } catch (parseError) {
+                console.error('Error parsing flow manager AI JSON:', parseError);
+            }
+        }
+
+        if (flowManagerFeedback.suggestion) {
+            addMessage(flowManagerFeedback.suggestion, 'ai', 'Flow Manager:');
+        }
+        if (flowManagerFeedback.nextS4Phase && flowManagerFeedback.nextS4Phase !== currentS4Phase) {
+            // Optionally update S4 progress based on Flow Manager's suggestion if it's a clear progression
+            // For now, we'll let Quality AI drive the main S4 progress, but this could be an override.
+        }
+
+
+      } catch (e) {
+        console.error('API Error:', e);
+        addMessage('Sorry, I encountered an error processing your message.', 'ai', `${currentScenario.customerName}:`);
+        addQualityFeedback(0, `API Error: ${e.message}`, { confidence, deadAirDuration, reasoning: `API Error: ${e.message}`, suggestions: 'Check network connection or API key.' });
+      } finally {
+        updateStatus('Click mic to start', false);
+        currentTranscript = '';
+        // Restore previous mute state and restart recognition if not muted and AI is not speaking
+        if (!wasMuted && !speechService.isSpeaking) {
+          isMuted = false;
+          muteBtn.classList.remove('muted');
+          muteBtn.querySelector('.button-icon').textContent = '🔊';
+          startRecognition();
+        }
+      }
+    }
+
+    micBtn.addEventListener('click', () => {
+      if (isRecognizing) {
+        stopRecognition();
+      } else {
+        startRecognition();
+      }
+    });
+
+    sendBtn.addEventListener('click', () => {
+      if (currentTranscript.trim()) {
+        const confidence = recognition && recognition.currentResult ? recognition.currentResult[0].confidence : 0;
+        const deadAirDuration = (performance.now() - lastSpeechEndTime) / 1000;
+        sendMessage(currentTranscript.trim(), confidence, deadAirDuration);
+      }
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      currentTranscript = '';
+      const messages = chat.querySelector('.messages').lastElementChild;
+      if (messages && messages.classList.contains('user') && !messages.classList.contains('sent')) {
+        messages.remove();
+      }
+      stopRecognition();
+      updateStatus('Click mic to start', false);
+      sendBtn.disabled = true;
+    });
+
+    muteBtn.addEventListener('click', toggleMute);
+
+    // --- Modal Functions ---
+    function showModal(title, bodyHtml, onSaveCallback, hideActionButtons = false) {
+        modalTitle.textContent = title;
+        modalBody.innerHTML = bodyHtml;
+        genericModal.classList.add('show');
+
+        modalSaveBtn.style.display = hideActionButtons ? 'none' : 'inline-block';
+        modalCancelBtn.style.display = hideActionButtons ? 'none' : 'inline-block';
+
+        modalSaveBtn.onclick = null; 
+        if (onSaveCallback) {
+            modalSaveBtn.onclick = onSaveCallback;
+        }
+    }
+
+    function hideModal() {
+        genericModal.classList.remove('show');
+    }
+
+    closeModalBtn.addEventListener('click', hideModal);
+    modalCancelBtn.addEventListener('click', hideModal);
+    // modalSaveBtn event listener is now set dynamically in showModal
+
+    document.getElementById('open-settings').addEventListener('click', () => {
+        let scenarioOptionsHtml = '';
+        const allScenarios = [];
+        for (const category in window.complaints) {
+            window.complaints[category].forEach(scenario => {
+                allScenarios.push(scenario);
+            });
+        }
+
+        // Create options for the dropdown
+        for (const category in window.complaints) {
+            scenarioOptionsHtml += `<optgroup label="${category.charAt(0).toUpperCase() + category.slice(1)}">`;
+            window.complaints[category].forEach(scenario => {
+                const selected = (scenario === currentScenario) ? 'selected' : ''; // Compare full scenario object
+                scenarioOptionsHtml += `<option value="${scenario.id}" ${selected}>${scenario.scenario}</option>`;
+            });
+            scenarioOptionsHtml += `</optgroup>`;
+        }
+
+        showModal('Settings', `
+            <p>Adjust application settings here.</p>
+            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                API Key:
+                <input type="password" id="settingApiKey" value="${API_KEY}" placeholder="Enter your API Key">
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" title="Manage your Google AI Studio API Keys" style="color: var(--accent-color); text-decoration: none;">🔗</a>
+            </label>
+            <label>
+                Enable Quality Scoring:
+                <input type="checkbox" id="settingEnableQuality" checked>
+            </label>
+            <label>
+                Speech Volume:
+                <input type="range" id="settingSpeechVolume" min="0" max="1" step="0.1" value="${speechService.volume}">
+                <span id="speechVolumeValue">${speechService.volume}</span>
+            </label>
+            <label>
+                Auto-Send Delay (seconds):
+                <input type="number" id="settingAutoSendDelay" min="1" max="10" step="0.5" value="${autoSendDelay / 1000}">
+            </label>
+            <label>
+                Call Scenario:
+                <select id="settingCallScenario">
+                    ${scenarioOptionsHtml}
+                </select>
+                <p style="font-size: 0.8em; color: var(--text-secondary); margin-top: 0.5rem;">Note: Voice quality depends on your browser's installed voices.</p>
+            </label>
+        `, () => {
+            // Save settings logic
+            speechService.setVolume(parseFloat(document.getElementById('settingSpeechVolume').value));
+            autoSendDelay = parseFloat(document.getElementById('settingAutoSendDelay').value) * 1000; // Convert to milliseconds
+            
+            const selectedScenarioId = document.getElementById('settingCallScenario').value;
+            // Find the selected scenario object
+            let selectedScenario = null;
+            for (const category in window.complaints) {
+                selectedScenario = window.complaints[category].find(s => s.id === selectedScenarioId);
+                if (selectedScenario) break;
+            }
+            currentScenario = selectedScenario;
+            currentInitialCustomerScenarioText = currentScenario ? currentScenario.initialComplaint : "Hello, how can I help you today?";
+
+
+            console.log('Settings saved:', { speechVolume: speechService.volume, autoSendDelay, currentScenario });
+            hideModal();
+            startNewRolePlay(); // Restart role play with new scenario
+        });
+
+        // Update volume display dynamically
+        const speechVolumeSlider = document.getElementById('settingSpeechVolume');
+        const speechVolumeValueSpan = document.getElementById('speechVolumeValue');
+        speechVolumeSlider.oninput = () => {
+            speechVolumeValueSpan.textContent = speechVolumeSlider.value;
+        };
+    });
+
+    document.getElementById('open-persona').addEventListener('click', () => {
+        showModal('Persona Selection', `
+            <p>Choose or customize AI personas for role-play.</p>
+            <label>
+                Customer Persona:
+                <textarea id="personaCustomer" rows="4" placeholder="Describe the customer persona">${customerPersona}</textarea>
+            </label>
+            <label>
+                Quality Assistant Persona:
+                <textarea id="personaQuality" rows="4" placeholder="Describe the quality assistant persona">${qualityAssistantPersona}</textarea>
+            </label>
+            <label>
+                Flow Manager Persona:
+                <textarea id="personaFlowManager" rows="4" placeholder="Describe the flow manager persona">${flowManagerPersona}</textarea>
+            </label>
+        `, () => {
+            // Save persona logic
+            customerPersona = document.getElementById('personaCustomer').value;
+            qualityAssistantPersona = document.getElementById('personaQuality').value;
+            flowManagerPersona = document.getElementById('personaFlowManager').value;
+            console.log('Personas saved:', { customerPersona, qualityAssistantPersona, flowManagerPersona });
+            hideModal();
+        });
+    });
+
+    // --- Save Call Button Logic ---
+    saveCallBtn.addEventListener('click', () => {
+        if (!window.firebaseDb || !window.getUserId()) {
+            showModal('Save Error', '<p>Firebase is not initialized or user not authenticated. Cannot save call. Please ensure you are connected to the internet and refresh the page.</p>', null);
+            return;
+        }
+
+        showModal('Save Call', `
+            <label>
+                Call Name:
+                <input type="text" id="callNameInput" placeholder="e.g., Billing Inquiry Practice 1">
+            </label>
+        `, async () => {
+            const callName = document.getElementById('callNameInput').value.trim();
+            if (!callName) {
+                showModal('Save Error', '<p>Please enter a name for the call.</p>', null);
+                return;
+            }
+
+            try {
+                const db = window.firebaseDb;
+                const userId = window.getUserId();
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+                // Path for private user data
+                const callsCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/calls`);
+
+                const callData = {
+                    callName: callName,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(), // Use server timestamp
+                    chatHistory: chatHistory,
+                    qualityFeedback: qualityFeedbackHistory,
+                    scenario: currentScenario ? currentScenario.id : 'random_scenario', // Save scenario ID
+                    userId: userId
+                };
+
+                await addDoc(callsCollectionRef, callData);
+                console.log("Call saved successfully!");
+                showModal('Success', `<p>Call "${callName}" saved successfully!</p>`, null);
+            } catch (e) {
+                console.error("Error saving call:", e);
+                showModal('Error', `<p>Failed to save call: ${e.message}</p>`, null);
+            }
+        });
+    });
+    // --- End Save Call Button Logic ---
+
+    // --- S4 Progress Indicator Logic ---
+    function updateS4Progress(phase) {
+        // Reset all phases first
+        for (const key in s4Phases) {
+            s4Phases[key].classList.remove('active', 'completed');
+        }
+
+        let foundActive = false;
+        for (const key of ['S1', 'S2', 'S3', 'S4']) { // Ensure correct order
+            if (key === phase) {
+                s4Phases[key].classList.add('active');
+                foundActive = true;
+            } else if (!foundActive) {
+                // This condition means 'key' is a phase *before* the current 'phase'
+                s4Phases[key].classList.add('completed');
+            }
+            // If foundActive is true, and key is not 'phase', then it's a future phase, so leave it default (grey)
+        }
+    }
+
+    // Function to start a new role-play session
+    function startNewRolePlay() {
+        chatHistory = []; // Clear history
+        qualityFeedbackHistory = []; // Clear quality feedback history
+        chat.querySelector('.messages').innerHTML = ''; // Clear chat display
+        qualityFeedbackPanel.innerHTML = '<div class="quality-comment">Feedback will appear here after each of your responses.</div>';
+        updateStatus('Start your call by speaking into the microphone.');
+        currentS4Phase = 'S1'; // Reset S4 phase
+        updateS4Progress(currentS4Phase); // Reset S4 progress to S1
+
+        // Add a prominent initial message about microphone permissions
+        addMessage("Welcome! To use the simulator, please ensure your browser has microphone access enabled. If you encounter issues, check your browser's site settings for microphone permissions and refresh the page.", 'ai', 'System:');
+
+        // Flatten all scenarios into a single array for random selection
+        const allScenarios = [];
+        for (const category in window.complaints) {
+            if (window.complaints && typeof window.complaints === 'object' && window.complaints[category]) {
+                window.complaints[category].forEach(scenario => {
+                    allScenarios.push(scenario);
+                });
+            }
+        }
+        
+        // Randomly select a new scenario, different from the previous one if possible
+        let newScenario = null;
+        if (allScenarios.length > 1) {
+            do {
+                const randomIndex = Math.floor(Math.random() * allScenarios.length);
+                newScenario = allScenarios[randomIndex];
+            } while (newScenario === currentScenario); // Keep shuffling if it's the same as last time
+        } else if (allScenarios.length === 1) {
+            newScenario = allScenarios[0];
+        } else {
+            newScenario = { id: 'default', scenario: 'Default Scenario', initialComplaint: "Hello, how can I help you today?", customerName: "Customer", customerGender: "neutral" };
+        }
+        currentScenario = newScenario;
+        currentInitialCustomerScenarioText = currentScenario.initialComplaint;
+
+        // The customer does NOT start the call. The agent (user) starts.
+        // The customer's initial complaint will be the *context* for the agent's first response.
+        // We will add a system message to set the scene.
+        addMessage(`Scenario: ${currentScenario.scenario}. The customer is ${currentScenario.customerName} and their initial complaint is: "${currentInitialCustomerScenarioText}". Please begin the call.`, 'ai', 'System:');
+        
+        // No initial customer message pushed to chatHistory here. The first user message will be the agent's greeting.
+        // The first customer message will be generated by the AI after the agent's first turn.
+    }
+
+    // Initial setup when the page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        // Ensure Firebase is initialized before proceeding with app logic that depends on it
+        const checkFirebaseReady = setInterval(() => {
+            if (window.firebaseDb && window.getUserId() !== 'anonymous') {
+                clearInterval(checkFirebaseReady);
+                console.log("Firebase is ready. User ID:", window.getUserId());
+                startNewRolePlay();
+            } else if (window.firebaseDb && window.getUserId() === 'anonymous' && typeof __initial_auth_token === 'undefined') {
+                clearInterval(checkFirebaseReady);
+                console.log("Firebase ready with anonymous user ID:", window.getUserId());
+                startNewRolePlay();
+            } else if (!window.firebaseConfig) {
+                clearInterval(checkFirebaseReady);
+                console.warn("Firebase config not found. Proceeding without call saving.");
+                startNewRolePlay();
+            }
+        }, 100);
+    });
+  </script>
 </body>
 </html>
